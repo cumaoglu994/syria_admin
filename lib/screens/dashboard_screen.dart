@@ -191,6 +191,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'route': '/announcements',
       },
       {'title': 'المحتوى', 'icon': Icons.article, 'route': '/content'},
+      {
+        'title': 'التوصيات الشخصية',
+        'icon': Icons.recommend,
+        'route': '/recommendations',
+      },
+      {
+        'title': 'اقتراحات الرحلات',
+        'icon': Icons.route,
+        'route': '/trip-suggestions',
+      },
+      {
+        'title': 'الخدمات السفلية',
+        'icon': Icons.list,
+        'route': '/bottom-services',
+      },
       {'title': 'الإحصائيات', 'icon': Icons.analytics, 'route': '/analytics'},
       {'title': 'الإعدادات', 'icon': Icons.settings, 'route': '/settings'},
     ];
@@ -345,7 +360,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisCount: 4,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 1.5,
+        childAspectRatio: 1.8,
       ),
       itemCount: stats.length,
       itemBuilder: (context, index) {
@@ -357,7 +372,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildStatCard(Map<String, dynamic> stat) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -371,6 +386,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -378,34 +394,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Icon(
                 stat['icon'] as IconData,
                 color: stat['color'] as Color,
-                size: 32,
+                size: 28,
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: (stat['changeColor'] as Color).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   stat['change'] as String,
                   style: TextStyle(
                     color: stat['changeColor'] as Color,
-                    fontSize: 12,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            stat['value'] as String,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            stat['title'] as String,
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+          const SizedBox(height: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  stat['value'] as String,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  stat['title'] as String,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -455,7 +484,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisCount: 4,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 1.2,
+            childAspectRatio: 1.4,
           ),
           itemCount: actions.length,
           itemBuilder: (context, index) {
@@ -474,7 +503,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -482,17 +511,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               action['icon'] as IconData,
               color: action['color'] as Color,
-              size: 32,
+              size: 28,
             ),
-            const SizedBox(height: 12),
-            Text(
-              action['title'] as String,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            const SizedBox(height: 8),
+            Expanded(
+              child: Text(
+                action['title'] as String,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),

@@ -9,6 +9,9 @@ import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/tourist_sites_screen.dart';
 import 'screens/events_screen.dart';
+import 'screens/personalized_recommendations_screen.dart';
+import 'screens/trip_suggestions_screen.dart';
+import 'screens/bottom_services_screen.dart';
 import 'constants/app_constants.dart';
 
 void main() async {
@@ -108,6 +111,10 @@ class MyApp extends StatelessWidget {
           '/dashboard': (context) => const DashboardScreen(),
           '/sites': (context) => const TouristSitesScreen(),
           '/events': (context) => const EventsScreen(),
+          '/recommendations': (context) =>
+              const PersonalizedRecommendationsScreen(),
+          '/trip-suggestions': (context) => const TripSuggestionsScreen(),
+          '/bottom-services': (context) => const BottomServicesScreen(),
         },
       ),
     );

@@ -215,14 +215,16 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
                     title: Text(site.name),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(site.city),
                         Text(
                           site.description,
-                          maxLines: 2,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.star,
@@ -238,8 +240,11 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
                               color: Colors.red[600],
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              '${site.latitude.toStringAsFixed(4)}, ${site.longitude.toStringAsFixed(4)}',
+                            Expanded(
+                              child: Text(
+                                '${site.latitude.toStringAsFixed(4)}, ${site.longitude.toStringAsFixed(4)}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
@@ -467,7 +472,8 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
         ],
       ),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 600,
+        height: MediaQuery.of(context).size.height * 0.8,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(

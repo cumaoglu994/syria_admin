@@ -209,10 +209,16 @@ class _EventsScreenState extends State<EventsScreen> {
                     title: Text(event.title),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(event.description),
+                        Text(
+                          event.description,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         const SizedBox(height: 4),
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.location_on,
@@ -220,7 +226,12 @@ class _EventsScreenState extends State<EventsScreen> {
                               color: Colors.red[600],
                             ),
                             const SizedBox(width: 4),
-                            Text(event.location),
+                            Expanded(
+                              child: Text(
+                                event.location,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                             const SizedBox(width: 16),
                             Icon(
                               Icons.calendar_today,
@@ -235,6 +246,7 @@ class _EventsScreenState extends State<EventsScreen> {
                         ),
                         const SizedBox(height: 4),
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.access_time,
@@ -506,7 +518,8 @@ class _EventDialogState extends State<EventDialog> {
         ],
       ),
       content: SizedBox(
-        width: double.maxFinite,
+        width: 600,
+        height: MediaQuery.of(context).size.height * 0.8,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
