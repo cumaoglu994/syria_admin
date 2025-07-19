@@ -1,0 +1,40 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Profile images
+    match /profile_images/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Site images
+    match /site_images/{siteId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isModerator();
+    }
+    
+    // Event images
+    match /event_images/{eventId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isModerator();
+    }
+    
+    // Announcement images
+    match /announcement_images/{announcementId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isModerator();
+    }
+    
+    // Content files
+    match /content/{contentId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isModerator();
+    }
+    
+    // Helper function to check if user is moderator
+    function isModerator() {
+      return request.auth != null && 
+             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'moderator'];
+    }
+  }
+} 
