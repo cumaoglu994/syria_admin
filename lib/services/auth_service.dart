@@ -121,7 +121,7 @@ class AuthService {
         id: user.uid,
         email: user.email ?? '',
         displayName: displayName,
-        role: app_user.UserRole.user,
+        role: app_user.UserRole.admin, // Yeni kullanıcıları admin yap
         status: app_user.UserStatus.active,
         createdAt: DateTime.now(),
         lastLoginAt: DateTime.now(),
