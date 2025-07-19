@@ -37,6 +37,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       backgroundColor: const Color(0xFF1976D2),
       elevation: 0,
+      leading: Navigator.canPop(context)
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
+            )
+          : null,
       actions: [
         // Notifications
         IconButton(
@@ -216,7 +222,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             setState(() {
               _selectedIndex = index;
             });
-            // TODO: Navigate to route
+            _navigateToRoute(item['route'] as String);
           },
         );
       },
@@ -634,5 +640,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
     );
+  }
+
+  void _navigateToRoute(String route) {
+    Navigator.of(context).pushReplacementNamed(route);
   }
 }

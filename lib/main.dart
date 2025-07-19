@@ -7,6 +7,8 @@ import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/tourist_sites_screen.dart';
+import 'screens/events_screen.dart';
 import 'constants/app_constants.dart';
 
 void main() async {
@@ -104,6 +106,8 @@ class MyApp extends StatelessWidget {
           '/': (context) => const AuthWrapper(),
           '/login': (context) => const LoginScreen(),
           '/dashboard': (context) => const DashboardScreen(),
+          '/sites': (context) => const TouristSitesScreen(),
+          '/events': (context) => const EventsScreen(),
         },
       ),
     );
