@@ -8,6 +8,7 @@ class TouristSite {
   final String address;
   final String phone;
   final String website;
+  final String category;
   final double price;
   final double rating;
   final double latitude;
@@ -24,6 +25,7 @@ class TouristSite {
     required this.address,
     required this.phone,
     required this.website,
+    required this.category,
     required this.price,
     required this.rating,
     required this.latitude,
@@ -44,6 +46,7 @@ class TouristSite {
       address: data['address'] ?? '',
       phone: data['phone'] ?? '',
       website: data['website'] ?? '',
+      category: data['category'] ?? 'all',
       price: (data['price'] ?? 0.0).toDouble(),
       rating: (data['rating'] ?? 0.0).toDouble(),
       latitude: (data['latitude'] ?? 0.0).toDouble(),
@@ -62,6 +65,7 @@ class TouristSite {
       'address': address,
       'phone': phone,
       'website': website,
+      'category': category,
       'price': price,
       'rating': rating,
       'latitude': latitude,
@@ -80,6 +84,7 @@ class TouristSite {
     String? address,
     String? phone,
     String? website,
+    String? category,
     double? price,
     double? rating,
     double? latitude,
@@ -96,6 +101,7 @@ class TouristSite {
       address: address ?? this.address,
       phone: phone ?? this.phone,
       website: website ?? this.website,
+      category: category ?? this.category,
       price: price ?? this.price,
       rating: rating ?? this.rating,
       latitude: latitude ?? this.latitude,

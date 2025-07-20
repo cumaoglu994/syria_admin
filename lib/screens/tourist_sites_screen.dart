@@ -17,8 +17,10 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ImagePicker _picker = ImagePicker();
   List<TouristSite> _sites = [];
+  List<TouristSite> _filteredSites = [];
   bool _isLoading = true;
   String? _error;
+  String _selectedCategory = 'all';
 
   @override
   void initState() {
@@ -42,6 +44,8 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
           .map((doc) => TouristSite.fromFirestore(doc))
           .toList();
 
+      _filterSites();
+
       setState(() {
         _isLoading = false;
       });
@@ -51,6 +55,135 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
         _error = 'فشل في تحميل المواقع السياحية: $e';
       });
     }
+  }
+
+  void _filterSites() {
+    if (_selectedCategory == 'all') {
+      _filteredSites = List.from(_sites);
+    } else {
+      _filteredSites = _sites
+          .where((site) => site.category == _selectedCategory)
+          .toList();
+    }
+  }
+
+  void _onCategoryChanged(String category) {
+    setState(() {
+      _selectedCategory = category;
+    });
+    _filterSites();
+  }
+
+  Widget _buildCategoriesSection() {
+    final categories = [
+      {
+        'id': 'all',
+        'name': 'الكل',
+        'icon': Icons.all_inclusive,
+        'color': Colors.blue,
+      },
+      {
+        'id': 'archaeological',
+        'name': 'المواقع الأثرية',
+        'icon': Icons.architecture,
+        'color': Colors.amber,
+      },
+      {
+        'id': 'religious',
+        'name': 'الأماكن الدينية',
+        'icon': Icons.church,
+        'color': Colors.green,
+      },
+      {
+        'id': 'museums',
+        'name': 'المتاحف',
+        'icon': Icons.museum,
+        'color': Colors.red,
+      },
+      {
+        'id': 'parks',
+        'name': 'الحدائق',
+        'icon': Icons.park,
+        'color': Colors.teal,
+      },
+      {
+        'id': 'beaches',
+        'name': 'الشواطئ',
+        'icon': Icons.beach_access,
+        'color': Colors.orange,
+      },
+      {
+        'id': 'markets',
+        'name': 'الأسواق',
+        'icon': Icons.store,
+        'color': Colors.grey,
+      },
+      {
+        'id': 'castle',
+        'name': 'القلاع',
+        'icon': Icons.castle,
+        'color': Colors.purple,
+      },
+    ];
+
+    return Container(
+      height: 120,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          final category = categories[index];
+          final isSelected = _selectedCategory == category['id'];
+
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: () => _onCategoryChanged(category['id'] as String),
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? category['color'] as Color
+                          : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(30),
+                      border: isSelected
+                          ? Border.all(
+                              color: category['color'] as Color,
+                              width: 2,
+                            )
+                          : null,
+                    ),
+                    child: Icon(
+                      category['icon'] as IconData,
+                      color: isSelected ? Colors.white : Colors.grey[600],
+                      size: 24,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  category['name'] as String,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isSelected
+                        ? category['color'] as Color
+                        : Colors.grey[600],
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _addSite() async {
@@ -153,139 +286,152 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
           IconButton(onPressed: _loadSites, icon: const Icon(Icons.refresh)),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _loadSites,
-                    child: const Text('إعادة المحاولة'),
-                  ),
-                ],
-              ),
-            )
-          : _sites.isEmpty
-          ? const Center(
-              child: Text(
-                'لا توجد مواقع سياحية',
-                style: TextStyle(fontSize: 18),
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _sites.length,
-              itemBuilder: (context, index) {
-                final site = _sites[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: ListTile(
-                    leading: site.images.isNotEmpty
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              site.images.first,
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
+      body: Column(
+        children: [
+          // Categories Section
+          _buildCategoriesSection(),
+
+          // Sites List
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _error!,
+                          style: const TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadSites,
+                          child: const Text('إعادة المحاولة'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _filteredSites.isEmpty
+                ? const Center(
+                    child: Text(
+                      'لا توجد مواقع سياحية في هذه الفئة',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredSites.length,
+                    itemBuilder: (context, index) {
+                      final site = _filteredSites[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: ListTile(
+                          leading: site.images.isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    site.images.first,
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        width: 60,
+                                        height: 60,
+                                        color: Colors.grey[300],
+                                        child: const Icon(Icons.image),
+                                      );
+                                    },
+                                  ),
+                                )
+                              : Container(
                                   width: 60,
                                   height: 60,
                                   color: Colors.grey[300],
                                   child: const Icon(Icons.image),
-                                );
-                              },
-                            ),
-                          )
-                        : Container(
-                            width: 60,
-                            height: 60,
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.image),
-                          ),
-                    title: Text(site.name),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(site.city),
-                        Text(
-                          site.description,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.star,
-                              size: 16,
-                              color: Colors.amber[600],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(site.rating.toString()),
-                            const SizedBox(width: 16),
-                            Icon(
-                              Icons.location_on,
-                              size: 16,
-                              color: Colors.red[600],
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                '${site.latitude.toStringAsFixed(4)}, ${site.longitude.toStringAsFixed(4)}',
+                                ),
+                          title: Text(site.name),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(site.city),
+                              Text(
+                                site.description,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    trailing: PopupMenuButton(
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit),
-                              SizedBox(width: 8),
-                              Text('تعديل'),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.star,
+                                    size: 16,
+                                    color: Colors.amber[600],
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(site.rating.toString()),
+                                  const SizedBox(width: 16),
+                                  Icon(
+                                    Icons.location_on,
+                                    size: 16,
+                                    color: Colors.red[600],
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      '${site.latitude.toStringAsFixed(4)}, ${site.longitude.toStringAsFixed(4)}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text('حذف', style: TextStyle(color: Colors.red)),
+                          trailing: PopupMenuButton(
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit),
+                                    SizedBox(width: 8),
+                                    Text('تعديل'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'حذف',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                _editSite(site);
+                              } else if (value == 'delete') {
+                                _deleteSite(site);
+                              }
+                            },
                           ),
+                          onTap: () => _editSite(site),
                         ),
-                      ],
-                      onSelected: (value) {
-                        if (value == 'edit') {
-                          _editSite(site);
-                        } else if (value == 'delete') {
-                          _deleteSite(site);
-                        }
-                      },
-                    ),
-                    onTap: () => _editSite(site),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addSite,
         child: const Icon(Icons.add),
@@ -313,6 +459,7 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
   final _priceController = TextEditingController();
 
   String _selectedCity = AppConstants.syrianCities.first;
+  String _selectedCategory = 'all';
   double _rating = 0.0;
   double _latitude = 0.0;
   double _longitude = 0.0;
@@ -331,6 +478,7 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
       _websiteController.text = widget.site!.website;
       _priceController.text = widget.site!.price.toString();
       _selectedCity = widget.site!.city;
+      _selectedCategory = widget.site!.category;
       _rating = widget.site!.rating;
       _latitude = widget.site!.latitude;
       _longitude = widget.site!.longitude;
@@ -404,6 +552,7 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
         address: _addressController.text.trim(),
         phone: _phoneController.text.trim(),
         website: _websiteController.text.trim(),
+        category: _selectedCategory,
         price: double.tryParse(_priceController.text) ?? 0.0,
         rating: _rating,
         latitude: _latitude,
@@ -523,6 +672,36 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
                   onChanged: (value) {
                     setState(() {
                       _selectedCity = value!;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                DropdownButtonFormField<String>(
+                  value: _selectedCategory,
+                  decoration: const InputDecoration(
+                    labelText: 'الفئة',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    DropdownMenuItem(value: 'all', child: Text('الكل')),
+                    DropdownMenuItem(
+                      value: 'archaeological',
+                      child: Text('المواقع الأثرية'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'religious',
+                      child: Text('الأماكن الدينية'),
+                    ),
+                    DropdownMenuItem(value: 'museums', child: Text('المتاحف')),
+                    DropdownMenuItem(value: 'parks', child: Text('الحدائق')),
+                    DropdownMenuItem(value: 'beaches', child: Text('الشواطئ')),
+                    DropdownMenuItem(value: 'markets', child: Text('الأسواق')),
+                    DropdownMenuItem(value: 'castle', child: Text('القلاع')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCategory = value!;
                     });
                   },
                 ),
