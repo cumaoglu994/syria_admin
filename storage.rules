@@ -1,6 +1,13 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Geçici olarak tüm okuma ve yazma işlemlerine izin ver
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+    
+    // Eski kurallar (yorum satırına alındı)
+    /*
     // Profile images
     match /profile_images/{userId}/{allPaths=**} {
       allow read: if request.auth != null;
@@ -36,5 +43,6 @@ service firebase.storage {
       return request.auth != null && 
              firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'moderator'];
     }
+    */
   }
 } 

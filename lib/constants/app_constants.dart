@@ -13,6 +13,10 @@ class AppConstants {
   static const String announcementsCollection = 'announcements';
   static const String contentCollection = 'content';
   static const String settingsCollection = 'settings';
+  static const String personalizedRecommendationsCollection =
+      'personalized_recommendations';
+  static const String tripSuggestionsCollection = 'trip_suggestions';
+  static const String bottomServicesCollection = 'bottom_services';
 
   // Storage Paths
   static const String profileImagesPath = 'profile_images';

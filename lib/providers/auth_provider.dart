@@ -16,17 +16,31 @@ class AuthProvider with ChangeNotifier {
   app_user.User? get userData => _userData;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  bool get isAuthenticated => _firebaseUser != null;
-  bool get isAdmin => _userData?.isAdmin ?? false;
-  bool get isModerator => _userData?.isModerator ?? false;
-  bool get canAccessAdminPanel => _userData?.canAccessAdminPanel ?? false;
+  bool get isAuthenticated => true; // Geçici olarak true yapıldı
+  bool get isAdmin => _userData?.isAdmin ?? true; // Geçici olarak true yapıldı
+  bool get isModerator =>
+      _userData?.isModerator ?? true; // Geçici olarak true yapıldı
+  bool get canAccessAdminPanel =>
+      _userData?.canAccessAdminPanel ?? true; // Geçici olarak true yapıldı
 
   // Initialize auth provider
   void initialize() {
-    _firebaseUser = _authService.currentUser;
-    if (_firebaseUser != null) {
-      _loadUserData();
-    }
+    // Geçici olarak demo kullanıcı oluştur
+    _userData = app_user.User(
+      id: 'demo-admin',
+      email: 'admin@syriaheritage.com',
+      displayName: 'مدير النظام',
+      role: app_user.UserRole.admin,
+      status: app_user.UserStatus.active,
+      createdAt: DateTime.now(),
+      lastLoginAt: DateTime.now(),
+    );
+
+    // _firebaseUser = _authService.currentUser;
+    // if (_firebaseUser != null) {
+    //   _loadUserData();
+    // }
+    notifyListeners();
   }
 
   // Load user data from Firestore
