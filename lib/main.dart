@@ -12,6 +12,9 @@ import 'screens/events_screen.dart';
 import 'screens/personalized_recommendations_screen.dart';
 import 'screens/trip_suggestions_screen.dart';
 import 'screens/bottom_services_screen.dart';
+import 'screens/users_screen.dart';
+import 'screens/analytics_screen.dart';
+import 'screens/settings_screen.dart';
 import 'constants/app_constants.dart';
 
 void main() async {
@@ -115,6 +118,9 @@ class MyApp extends StatelessWidget {
               const PersonalizedRecommendationsScreen(),
           '/trip-suggestions': (context) => const TripSuggestionsScreen(),
           '/bottom-services': (context) => const BottomServicesScreen(),
+          '/users': (context) => const UsersScreen(),
+          '/analytics': (context) => const AnalyticsScreen(),
+          '/settings': (context) => const SettingsScreen(),
         },
       ),
     );

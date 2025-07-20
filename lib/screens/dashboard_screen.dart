@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../constants/app_constants.dart';
+import '../services/firebase_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -12,6 +13,39 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
+  final FirebaseService _firebaseService = FirebaseService();
+  Map<String, dynamic> _analyticsData = {};
+  List<Map<String, dynamic>> _recentActivity = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final analyticsData = await _firebaseService.getAnalyticsData();
+
+      setState(() {
+        _analyticsData = analyticsData;
+        _recentActivity = List<Map<String, dynamic>>.from(
+          analyticsData['recentActivity'] ?? [],
+        );
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading dashboard data: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -183,14 +217,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
       {'title': 'الأحداث', 'icon': Icons.event, 'route': '/events'},
       {'title': 'المستخدمين', 'icon': Icons.people, 'route': '/users'},
-      {'title': 'الحجوزات', 'icon': Icons.book_online, 'route': '/bookings'},
-      {'title': 'المراجعات', 'icon': Icons.rate_review, 'route': '/reviews'},
-      {
-        'title': 'الإعلانات',
-        'icon': Icons.announcement,
-        'route': '/announcements',
-      },
-      {'title': 'المحتوى', 'icon': Icons.article, 'route': '/content'},
       {
         'title': 'التوصيات الشخصية',
         'icon': Icons.recommend,
@@ -206,6 +232,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'icon': Icons.list,
         'route': '/bottom-services',
       },
+      {'title': 'الحجوزات', 'icon': Icons.book_online, 'route': '/bookings'},
+      {'title': 'المراجعات', 'icon': Icons.rate_review, 'route': '/reviews'},
+      {
+        'title': 'الإعلانات',
+        'icon': Icons.announcement,
+        'route': '/announcements',
+      },
+      {'title': 'المحتوى', 'icon': Icons.article, 'route': '/content'},
+
       {'title': 'الإحصائيات', 'icon': Icons.analytics, 'route': '/analytics'},
       {'title': 'الإعدادات', 'icon': Icons.settings, 'route': '/settings'},
     ];
@@ -318,10 +353,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildStatisticsCards() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     final stats = [
       {
         'title': 'المواقع السياحية',
-        'value': '156',
+        'value': '${_analyticsData['totalSites'] ?? 0}',
         'icon': Icons.location_on,
         'color': Colors.blue,
         'change': '+12%',
@@ -329,7 +368,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
       {
         'title': 'الأحداث النشطة',
-        'value': '23',
+        'value': '${_analyticsData['totalEvents'] ?? 0}',
         'icon': Icons.event,
         'color': Colors.orange,
         'change': '+5%',
@@ -337,16 +376,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
       {
         'title': 'المستخدمين النشطين',
-        'value': '1,234',
+        'value': '${_analyticsData['totalUsers'] ?? 0}',
         'icon': Icons.people,
         'color': Colors.green,
         'change': '+8%',
         'changeColor': Colors.green,
       },
       {
-        'title': 'الحجوزات اليوم',
-        'value': '89',
-        'icon': Icons.book_online,
+        'title': 'التوصيات',
+        'value': '${_analyticsData['totalRecommendations'] ?? 0}',
+        'icon': Icons.recommend,
         'color': Colors.purple,
         'change': '+15%',
         'changeColor': Colors.green,
@@ -496,19 +535,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'title': 'إضافة موقع جديد',
         'icon': Icons.add_location,
         'color': Colors.blue,
-        'route': '/sites/add',
+        'route': '/sites',
       },
       {
         'title': 'إنشاء حدث',
         'icon': Icons.event,
         'color': Colors.orange,
-        'route': '/events/add',
+        'route': '/events',
       },
       {
-        'title': 'إضافة إعلان',
-        'icon': Icons.announcement,
+        'title': 'التوصيات',
+        'icon': Icons.recommend,
         'color': Colors.green,
-        'route': '/announcements/add',
+        'route': '/recommendations',
       },
       {
         'title': 'إدارة المستخدمين',
@@ -548,7 +587,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildActionCard(Map<String, dynamic> action) {
     return InkWell(
       onTap: () {
-        // TODO: Navigate to route
+        _navigateToRoute(action['route'] as String);
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -619,6 +658,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildRecentActivity() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -640,34 +683,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
-          child: Column(
-            children: [
-              _buildActivityItem(
-                'تم إضافة موقع جديد: قلعة دمشق',
-                'منذ 2 ساعة',
-                Icons.add_location,
-                Colors.blue,
-              ),
-              _buildActivityItem(
-                'تم إنشاء حدث: مهرجان التراث السوري',
-                'منذ 4 ساعات',
-                Icons.event,
-                Colors.orange,
-              ),
-              _buildActivityItem(
-                'تم تسجيل مستخدم جديد',
-                'منذ 6 ساعات',
-                Icons.person_add,
-                Colors.green,
-              ),
-              _buildActivityItem(
-                'تم تحديث إعدادات النظام',
-                'منذ يوم واحد',
-                Icons.settings,
-                Colors.grey,
-              ),
-            ],
-          ),
+          child: _recentActivity.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text(
+                      'لا يوجد نشاط حديث',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                )
+              : Column(
+                  children: _recentActivity.take(5).map((activity) {
+                    return _buildActivityItem(
+                      activity['title'] as String,
+                      _formatTime(activity['time'] as DateTime),
+                      _getActivityIcon(activity['icon'] as String),
+                      _getActivityColor(activity['color'] as String),
+                    );
+                  }).toList(),
+                ),
         ),
       ],
     );
@@ -762,5 +797,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _navigateToRoute(String route) {
     Navigator.of(context).pushReplacementNamed(route);
+  }
+
+  String _formatTime(DateTime time) {
+    final now = DateTime.now();
+    final difference = now.difference(time);
+
+    if (difference.inMinutes < 60) {
+      return 'منذ ${difference.inMinutes} دقيقة';
+    } else if (difference.inHours < 24) {
+      return 'منذ ${difference.inHours} ساعة';
+    } else if (difference.inDays < 7) {
+      return 'منذ ${difference.inDays} يوم';
+    } else {
+      return 'منذ ${difference.inDays ~/ 7} أسبوع';
+    }
+  }
+
+  IconData _getActivityIcon(String icon) {
+    switch (icon) {
+      case 'add_location':
+        return Icons.add_location;
+      case 'event':
+        return Icons.event;
+      case 'person_add':
+        return Icons.person_add;
+      case 'settings':
+        return Icons.settings;
+      default:
+        return Icons.info;
+    }
+  }
+
+  Color _getActivityColor(String color) {
+    switch (color) {
+      case 'blue':
+        return Colors.blue;
+      case 'orange':
+        return Colors.orange;
+      case 'green':
+        return Colors.green;
+      case 'red':
+        return Colors.red;
+      case 'purple':
+        return Colors.purple;
+      default:
+        return Colors.grey;
+    }
   }
 }
