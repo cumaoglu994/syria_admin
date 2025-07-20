@@ -4,14 +4,14 @@ import '../models/bottom_service.dart';
 import '../constants/app_constants.dart';
 import '../widgets/bottom_service_dialog.dart';
 
-class EventsScreen extends StatefulWidget {
-  const EventsScreen({super.key});
+class NewsScreen extends StatefulWidget {
+  const NewsScreen({super.key});
 
   @override
-  State<EventsScreen> createState() => _EventsScreenState();
+  State<NewsScreen> createState() => _NewsScreenState();
 }
 
-class _EventsScreenState extends State<EventsScreen> {
+class _NewsScreenState extends State<NewsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   List<BottomService> _services = [];
   bool _isLoading = true;
@@ -31,15 +31,15 @@ class _EventsScreenState extends State<EventsScreen> {
         _error = null;
       });
 
-      print('Loading events services from Firebase...');
+      print('Loading news services from Firebase...');
 
       final snapshot = await _firestore
           .collection(AppConstants.bottomServicesCollection)
-          .where('serviceType', isEqualTo: 'events')
+          .where('serviceType', isEqualTo: 'news')
           .orderBy('displayOrder')
           .get();
 
-      print('Firebase response: ${snapshot.docs.length} events found');
+      print('Firebase response: ${snapshot.docs.length} news found');
 
       List<BottomService> allServices = [];
 
@@ -47,7 +47,7 @@ class _EventsScreenState extends State<EventsScreen> {
         try {
           final service = BottomService.fromFirestore(doc);
           allServices.add(service);
-          print('Loaded event: ${service.title.ar}');
+          print('Loaded news: ${service.title.ar}');
         } catch (e) {
           print('Error parsing document ${doc.id}: $e');
         }
@@ -67,12 +67,12 @@ class _EventsScreenState extends State<EventsScreen> {
         _isLoading = false;
       });
 
-      print('Events loaded successfully: ${_services.length} events');
+      print('News loaded successfully: ${_services.length} news');
     } catch (e) {
-      print('Error loading events: $e');
+      print('Error loading news: $e');
       setState(() {
         _isLoading = false;
-        _error = 'فشل في تحميل الأحداث: $e';
+        _error = 'فشل في تحميل الأخبار: $e';
       });
     }
   }
@@ -80,7 +80,7 @@ class _EventsScreenState extends State<EventsScreen> {
   Future<void> _addService() async {
     final result = await showDialog<BottomService>(
       context: context,
-      builder: (context) => const BottomServiceDialog(serviceType: 'events'),
+      builder: (context) => const BottomServiceDialog(serviceType: 'news'),
     );
 
     if (result != null) {
@@ -130,7 +130,7 @@ class _EventsScreenState extends State<EventsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('تم حذف الحدث بنجاح'),
+              content: Text('تم حذف الخبر بنجاح'),
               backgroundColor: Colors.green,
             ),
           );
@@ -139,7 +139,7 @@ class _EventsScreenState extends State<EventsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('فشل في حذف الحدث: $e'),
+              content: Text('فشل في حذف الخبر: $e'),
               backgroundColor: Colors.red,
             ),
           );
@@ -160,7 +160,7 @@ class _EventsScreenState extends State<EventsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              service.isActive ? 'تم إلغاء تفعيل الحدث' : 'تم تفعيل الحدث',
+              service.isActive ? 'تم إلغاء تفعيل الخبر' : 'تم تفعيل الخبر',
             ),
             backgroundColor: Colors.green,
           ),
@@ -170,7 +170,7 @@ class _EventsScreenState extends State<EventsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('فشل في تحديث حالة الحدث: $e'),
+            content: Text('فشل في تحديث حالة الخبر: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -182,7 +182,7 @@ class _EventsScreenState extends State<EventsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('إدارة الأحداث'),
+        title: const Text('إدارة الأخبار'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -202,7 +202,7 @@ class _EventsScreenState extends State<EventsScreen> {
             padding: const EdgeInsets.all(16),
             child: TextField(
               decoration: const InputDecoration(
-                labelText: 'البحث في الأحداث...',
+                labelText: 'البحث في الأخبار...',
                 hintText: 'ابحث بالعنوان أو الوصف',
                 prefixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
@@ -244,7 +244,7 @@ class _EventsScreenState extends State<EventsScreen> {
                 : _services.isEmpty
                 ? const Center(
                     child: Text(
-                      'لا توجد أحداث',
+                      'لا توجد أخبار',
                       style: TextStyle(fontSize: 18),
                     ),
                   )
@@ -267,8 +267,8 @@ class _EventsScreenState extends State<EventsScreen> {
   }
 
   Widget _buildStatistics() {
-    final totalEvents = _services.length;
-    final activeEvents = _services.where((s) => s.isActive).length;
+    final totalNews = _services.length;
+    final activeNews = _services.where((s) => s.isActive).length;
     final totalClicks = _services.fold<int>(0, (sum, s) => sum + s.clicks);
 
     return Container(
@@ -277,17 +277,17 @@ class _EventsScreenState extends State<EventsScreen> {
         children: [
           Expanded(
             child: _buildStatCard(
-              'إجمالي الأحداث',
-              totalEvents.toString(),
-              Icons.event,
-              Colors.green,
+              'إجمالي الأخبار',
+              totalNews.toString(),
+              Icons.newspaper,
+              Colors.orange,
             ),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: _buildStatCard(
-              'الأحداث النشطة',
-              activeEvents.toString(),
+              'الأخبار النشطة',
+              activeNews.toString(),
               Icons.check_circle,
               Colors.blue,
             ),
@@ -298,7 +298,7 @@ class _EventsScreenState extends State<EventsScreen> {
               'إجمالي النقرات',
               totalClicks.toString(),
               Icons.touch_app,
-              Colors.orange,
+              Colors.green,
             ),
           ),
         ],
@@ -437,16 +437,16 @@ class _EventsScreenState extends State<EventsScreen> {
 
   IconData _getIconFromString(String iconString) {
     switch (iconString.toLowerCase()) {
-      case 'event':
-        return Icons.event;
-      case 'music_note':
-        return Icons.music_note;
-      case 'festival':
-        return Icons.celebration;
-      case 'theater_comedy':
-        return Icons.theater_comedy;
+      case 'newspaper':
+        return Icons.newspaper;
+      case 'article':
+        return Icons.article;
+      case 'rss_feed':
+        return Icons.rss_feed;
+      case 'campaign':
+        return Icons.campaign;
       default:
-        return Icons.event;
+        return Icons.newspaper;
     }
   }
 }

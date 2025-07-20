@@ -95,13 +95,29 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
         _error = null;
       });
 
+      print('Loading services from Firebase...');
+
+      // Basit sorgu kullanarak index hatasını önleyelim
       final snapshot = await _firestore
           .collection(AppConstants.bottomServicesCollection)
+          .orderBy('displayOrder')
           .get();
 
-      List<BottomService> allServices = snapshot.docs
-          .map((doc) => BottomService.fromFirestore(doc))
-          .toList();
+      print('Firebase response: ${snapshot.docs.length} documents found');
+
+      List<BottomService> allServices = [];
+
+      for (var doc in snapshot.docs) {
+        try {
+          final service = BottomService.fromFirestore(doc);
+          allServices.add(service);
+          print('Loaded service: ${service.title.ar} (${service.serviceType})');
+        } catch (e) {
+          print('Error parsing document ${doc.id}: $e');
+        }
+      }
+
+      print('Total services loaded: ${allServices.length}');
 
       // Filtreleme işlemleri
       List<BottomService> filteredServices = allServices;
@@ -143,6 +159,8 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
         _services = filteredServices;
         _isLoading = false;
       });
+
+      print('Services loaded successfully: ${_services.length} services');
     } catch (e) {
       print('Error loading services: $e');
       setState(() {
@@ -163,6 +181,66 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
     }
   }
 
+  Future<void> _editService(BottomService service) async {
+    final result = await showDialog<BottomService>(
+      context: context,
+      builder: (context) => BottomServiceDialog(service: service),
+    );
+
+    if (result != null) {
+      await _loadServices();
+    }
+  }
+
+  Future<void> _deleteService(BottomService service) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تأكيد الحذف'),
+        content: Text('هل أنت متأكد من حذف "${service.title.ar}"؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _firestore
+            .collection(AppConstants.bottomServicesCollection)
+            .doc(service.id)
+            .delete();
+
+        await _loadServices();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم حذف الخدمة بنجاح'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('فشل في حذف الخدمة: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _addSampleData() async {
     try {
       setState(() {
@@ -170,6 +248,7 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
       });
 
       final sampleServices = [
+        // Transportation services
         {
           'title': {
             'ar': 'سيارات الأجرة',
@@ -201,6 +280,36 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
         },
         {
           'title': {
+            'ar': 'الحافلات',
+            'en': 'Buses',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'description': {
+            'ar': 'خدمات النقل بالحافلات',
+            'en': 'Bus transportation services',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'serviceType': 'transportation',
+          'route': '/transportation',
+          'externalUrl': '',
+          'customAction': '',
+          'icon': 'directions_bus',
+          'color': 'blue',
+          'displayOrder': 2,
+          'isActive': true,
+          'clicks': 8,
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+        // Events services
+        {
+          'title': {
             'ar': 'مهرجان التراث',
             'en': 'Heritage Festival',
             'tr': '',
@@ -230,6 +339,36 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
         },
         {
           'title': {
+            'ar': 'حفلات موسيقية',
+            'en': 'Music Concerts',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'description': {
+            'ar': 'الحفلات الموسيقية التقليدية',
+            'en': 'Traditional music concerts',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'serviceType': 'events',
+          'route': '/events',
+          'externalUrl': '',
+          'customAction': '',
+          'icon': 'music_note',
+          'color': 'green',
+          'displayOrder': 2,
+          'isActive': true,
+          'clicks': 18,
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+        // News services
+        {
+          'title': {
             'ar': 'أخبار السياحة',
             'en': 'Tourism News',
             'tr': '',
@@ -254,6 +393,185 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
           'displayOrder': 1,
           'isActive': true,
           'clicks': 12,
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+        {
+          'title': {
+            'ar': 'أخبار التراث',
+            'en': 'Heritage News',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'description': {
+            'ar': 'أخبار التراث والآثار',
+            'en': 'Heritage and archaeology news',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'serviceType': 'news',
+          'route': '/news',
+          'externalUrl': '',
+          'customAction': '',
+          'icon': 'article',
+          'color': 'orange',
+          'displayOrder': 2,
+          'isActive': true,
+          'clicks': 9,
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+        // Opportunities services
+        {
+          'title': {
+            'ar': 'فرص العمل',
+            'en': 'Job Opportunities',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'description': {
+            'ar': 'فرص العمل في قطاع السياحة',
+            'en': 'Job opportunities in tourism sector',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'serviceType': 'opportunities',
+          'route': '/opportunities',
+          'externalUrl': '',
+          'customAction': '',
+          'icon': 'lightbulb_outline',
+          'color': 'purple',
+          'displayOrder': 1,
+          'isActive': true,
+          'clicks': 18,
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+        // Accommodation services
+        {
+          'title': {
+            'ar': 'فنادق دمشق',
+            'en': 'Damascus Hotels',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'description': {
+            'ar': 'أفضل الفنادق في دمشق',
+            'en': 'Best hotels in Damascus',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'serviceType': 'accommodation',
+          'route': '/accommodation',
+          'externalUrl': '',
+          'customAction': '',
+          'icon': 'hotel',
+          'color': 'amber',
+          'displayOrder': 1,
+          'isActive': true,
+          'clicks': 22,
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+        // Restaurants services
+        {
+          'title': {
+            'ar': 'مطاعم تقليدية',
+            'en': 'Traditional Restaurants',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'description': {
+            'ar': 'أفضل المطاعم التقليدية السورية',
+            'en': 'Best traditional Syrian restaurants',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'serviceType': 'restaurants',
+          'route': '/restaurants',
+          'externalUrl': '',
+          'customAction': '',
+          'icon': 'restaurant',
+          'color': 'red',
+          'displayOrder': 1,
+          'isActive': true,
+          'clicks': 30,
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+        // Facilities services
+        {
+          'title': {
+            'ar': 'المستشفيات',
+            'en': 'Hospitals',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'description': {
+            'ar': 'المستشفيات والمرافق الطبية',
+            'en': 'Hospitals and medical facilities',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'serviceType': 'facilities',
+          'route': '/facilities',
+          'externalUrl': '',
+          'customAction': '',
+          'icon': 'local_hospital',
+          'color': 'teal',
+          'displayOrder': 1,
+          'isActive': true,
+          'clicks': 5,
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+        // Announcements services
+        {
+          'title': {
+            'ar': 'إعلانات مهمة',
+            'en': 'Important Announcements',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'description': {
+            'ar': 'الإعلانات المهمة للسياح',
+            'en': 'Important announcements for tourists',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'serviceType': 'announcements',
+          'route': '/announcements',
+          'externalUrl': '',
+          'customAction': '',
+          'icon': 'notifications',
+          'color': 'indigo',
+          'displayOrder': 1,
+          'isActive': true,
+          'clicks': 35,
           'createdAt': Timestamp.now(),
           'updatedAt': Timestamp.now(),
         },
@@ -379,6 +697,31 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
               const SizedBox(width: 16),
               Expanded(
                 child: DropdownButtonFormField<String>(
+                  value: _filterServiceType,
+                  decoration: const InputDecoration(
+                    labelText: 'نوع الخدمة',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem(value: 'all', child: Text('الكل')),
+                    ..._serviceTypes.map(
+                      (type) => DropdownMenuItem(
+                        value: type['type'],
+                        child: Text(type['title']),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _filterServiceType = value!;
+                    });
+                    _loadServices();
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: DropdownButtonFormField<String>(
                   value: _sortBy,
                   decoration: const InputDecoration(
                     labelText: 'الترتيب',
@@ -456,6 +799,7 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
       elevation: 2,
       child: InkWell(
         onTap: () {
+          // Servis türüne özel ekrana git
           Navigator.of(context).pushNamed(serviceType['route']);
         },
         borderRadius: BorderRadius.circular(12),
@@ -666,10 +1010,10 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
           onSelected: (value) {
             switch (value) {
               case 'edit':
-                // TODO: Implement edit
+                _editService(service);
                 break;
               case 'delete':
-                // TODO: Implement delete
+                _deleteService(service);
                 break;
             }
           },

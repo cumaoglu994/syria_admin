@@ -16,6 +16,13 @@ import 'screens/users_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/transportation_screen.dart';
+import 'screens/events_screen.dart';
+import 'screens/news_screen.dart';
+import 'screens/opportunities_screen.dart';
+import 'screens/restaurants_screen.dart';
+import 'screens/accommodation_screen.dart';
+import 'screens/facilities_screen.dart';
+import 'screens/announcements_screen.dart';
 import 'constants/app_constants.dart';
 
 void main() async {
@@ -123,6 +130,13 @@ class MyApp extends StatelessWidget {
           '/analytics': (context) => const AnalyticsScreen(),
           '/settings': (context) => const SettingsScreen(),
           '/transportation': (context) => const TransportationScreen(),
+          '/events': (context) => const EventsScreen(),
+          '/news': (context) => const NewsScreen(),
+          '/opportunities': (context) => const OpportunitiesScreen(),
+          '/restaurants': (context) => const RestaurantsScreen(),
+          '/accommodation': (context) => const AccommodationScreen(),
+          '/facilities': (context) => const FacilitiesScreen(),
+          '/announcements': (context) => const AnnouncementsScreen(),
         },
       ),
     );
