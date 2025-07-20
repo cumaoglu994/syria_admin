@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/bottom_service.dart';
 import '../models/personalized_recommendation.dart';
 import '../constants/app_constants.dart';
+import '../widgets/bottom_service_dialog.dart';
 
 class BottomServicesScreen extends StatefulWidget {
   const BottomServicesScreen({super.key});
@@ -17,9 +18,69 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
   bool _isLoading = true;
   String? _error;
   String _searchQuery = '';
-  String _filterStatus = 'all'; // 'all', 'active', 'inactive'
+  String _filterStatus = 'all';
   String _filterServiceType = 'all';
-  String _sortBy = 'displayOrder'; // 'displayOrder', 'createdAt', 'clicks'
+  String _sortBy = 'displayOrder';
+
+  // 8 farklı servis türü
+  final List<Map<String, dynamic>> _serviceTypes = [
+    {
+      'type': 'transportation',
+      'title': 'النقل',
+      'icon': Icons.directions_car,
+      'color': Colors.blue,
+      'route': '/transportation',
+    },
+    {
+      'type': 'events',
+      'title': 'الأحداث',
+      'icon': Icons.event,
+      'color': Colors.green,
+      'route': '/events',
+    },
+    {
+      'type': 'news',
+      'title': 'الأخبار',
+      'icon': Icons.newspaper,
+      'color': Colors.orange,
+      'route': '/news',
+    },
+    {
+      'type': 'opportunities',
+      'title': 'الفرص',
+      'icon': Icons.lightbulb_outline,
+      'color': Colors.purple,
+      'route': '/opportunities',
+    },
+    {
+      'type': 'accommodation',
+      'title': 'الإقامة',
+      'icon': Icons.hotel,
+      'color': Colors.amber,
+      'route': '/accommodation',
+    },
+    {
+      'type': 'restaurants',
+      'title': 'المطاعم',
+      'icon': Icons.restaurant,
+      'color': Colors.red,
+      'route': '/restaurants',
+    },
+    {
+      'type': 'facilities',
+      'title': 'المرافق',
+      'icon': Icons.local_hospital,
+      'color': Colors.teal,
+      'route': '/facilities',
+    },
+    {
+      'type': 'announcements',
+      'title': 'الإعلانات',
+      'icon': Icons.notifications,
+      'color': Colors.indigo,
+      'route': '/announcements',
+    },
+  ];
 
   @override
   void initState() {
@@ -34,52 +95,56 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
         _error = null;
       });
 
-      Query query = _firestore.collection(
-        AppConstants.bottomServicesCollection,
-      );
+      final snapshot = await _firestore
+          .collection(AppConstants.bottomServicesCollection)
+          .get();
 
-      // Apply filters
-      if (_filterStatus == 'active') {
-        query = query.where('isActive', isEqualTo: true);
-      } else if (_filterStatus == 'inactive') {
-        query = query.where('isActive', isEqualTo: false);
-      }
-
-      if (_filterServiceType != 'all') {
-        query = query.where('serviceType', isEqualTo: _filterServiceType);
-      }
-
-      // Apply sorting
-      switch (_sortBy) {
-        case 'createdAt':
-          query = query.orderBy('createdAt', descending: true);
-          break;
-        case 'clicks':
-          query = query.orderBy('clicks', descending: true);
-          break;
-        default:
-          query = query.orderBy('displayOrder', descending: false);
-      }
-
-      final snapshot = await query.get();
-
-      _services = snapshot.docs
+      List<BottomService> allServices = snapshot.docs
           .map((doc) => BottomService.fromFirestore(doc))
           .toList();
 
-      // Apply search filter
+      // Filtreleme işlemleri
+      List<BottomService> filteredServices = allServices;
+
+      if (_filterStatus == 'active') {
+        filteredServices = filteredServices.where((s) => s.isActive).toList();
+      } else if (_filterStatus == 'inactive') {
+        filteredServices = filteredServices.where((s) => !s.isActive).toList();
+      }
+
+      if (_filterServiceType != 'all') {
+        filteredServices = filteredServices
+            .where((s) => s.serviceType == _filterServiceType)
+            .toList();
+      }
+
       if (_searchQuery.isNotEmpty) {
-        _services = _services.where((service) {
+        filteredServices = filteredServices.where((service) {
           return service.title.ar.contains(_searchQuery) ||
               service.title.en.contains(_searchQuery) ||
               service.route.contains(_searchQuery);
         }).toList();
       }
 
+      switch (_sortBy) {
+        case 'createdAt':
+          filteredServices.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          break;
+        case 'clicks':
+          filteredServices.sort((a, b) => b.clicks.compareTo(a.clicks));
+          break;
+        default:
+          filteredServices.sort(
+            (a, b) => a.displayOrder.compareTo(b.displayOrder),
+          );
+      }
+
       setState(() {
+        _services = filteredServices;
         _isLoading = false;
       });
     } catch (e) {
+      print('Error loading services: $e');
       setState(() {
         _isLoading = false;
         _error = 'فشل في تحميل الخدمات: $e';
@@ -98,62 +163,133 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
     }
   }
 
-  Future<void> _editService(BottomService service) async {
-    final result = await showDialog<BottomService>(
-      context: context,
-      builder: (context) => BottomServiceDialog(service: service),
-    );
+  Future<void> _addSampleData() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
 
-    if (result != null) {
-      await _loadServices();
-    }
-  }
+      final sampleServices = [
+        {
+          'title': {
+            'ar': 'سيارات الأجرة',
+            'en': 'Taxis',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'description': {
+            'ar': 'خدمات النقل بالسيارات الأجرة',
+            'en': 'Taxi transportation services',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'serviceType': 'transportation',
+          'route': '/transportation',
+          'externalUrl': '',
+          'customAction': '',
+          'icon': 'directions_car',
+          'color': 'blue',
+          'displayOrder': 1,
+          'isActive': true,
+          'clicks': 15,
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+        {
+          'title': {
+            'ar': 'مهرجان التراث',
+            'en': 'Heritage Festival',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'description': {
+            'ar': 'مهرجان التراث السوري السنوي',
+            'en': 'Annual Syrian Heritage Festival',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'serviceType': 'events',
+          'route': '/events',
+          'externalUrl': '',
+          'customAction': '',
+          'icon': 'event',
+          'color': 'green',
+          'displayOrder': 1,
+          'isActive': true,
+          'clicks': 25,
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+        {
+          'title': {
+            'ar': 'أخبار السياحة',
+            'en': 'Tourism News',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'description': {
+            'ar': 'أحدث أخبار السياحة في سوريا',
+            'en': 'Latest tourism news in Syria',
+            'tr': '',
+            'fr': '',
+            'ru': '',
+            'zh': '',
+          },
+          'serviceType': 'news',
+          'route': '/news',
+          'externalUrl': '',
+          'customAction': '',
+          'icon': 'newspaper',
+          'color': 'orange',
+          'displayOrder': 1,
+          'isActive': true,
+          'clicks': 12,
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        },
+      ];
 
-  Future<void> _deleteService(BottomService service) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('تأكيد الحذف'),
-        content: Text('هل أنت متأكد من حذف "${service.title.ar}"؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('حذف'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
+      for (final serviceData in sampleServices) {
         await _firestore
             .collection(AppConstants.bottomServicesCollection)
-            .doc(service.id)
-            .delete();
+            .add(serviceData);
+      }
 
-        await _loadServices();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم حذف الخدمة بنجاح'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('فشل في حذف الخدمة: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      await _loadServices();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إضافة البيانات التجريبية بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error adding sample data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل في إضافة البيانات التجريبية: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -169,179 +305,27 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
               Navigator.of(context).pushReplacementNamed('/dashboard'),
         ),
         actions: [
-          IconButton(onPressed: _loadServices, icon: const Icon(Icons.refresh)),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Search and Filter Bar
-          _buildSearchAndFilterBar(),
-
-          // Statistics
-          _buildStatistics(),
-
-          // Services List
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _error!,
-                          style: const TextStyle(color: Colors.red),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadServices,
-                          child: const Text('إعادة المحاولة'),
-                        ),
-                      ],
-                    ),
-                  )
-                : _services.isEmpty
-                ? const Center(
-                    child: Text(
-                      'لا توجد خدمات',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _services.length,
-                    itemBuilder: (context, index) {
-                      final service = _services[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: _getColorFromString(service.color),
-                            child: Icon(
-                              _getIconFromString(service.icon),
-                              color: Colors.white,
-                            ),
-                          ),
-                          title: Text(service.title.ar),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (service.description.ar.isNotEmpty)
-                                Text(
-                                  service.description.ar,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _getServiceTypeColor(
-                                        service.serviceType,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      _getServiceTypeLabel(service.serviceType),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      service.serviceType == 'internal'
-                                          ? service.route
-                                          : service.serviceType == 'external'
-                                          ? service.externalUrl
-                                          : service.customAction,
-                                      style: const TextStyle(fontSize: 12),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Icon(
-                                    Icons.touch_app,
-                                    size: 16,
-                                    color: Colors.blue[600],
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text('${service.clicks}'),
-                                  const SizedBox(width: 16),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: service.isActive
-                                          ? Colors.green
-                                          : Colors.grey,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      service.isActive ? 'نشط' : 'غير نشط',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          trailing: PopupMenuButton(
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.edit),
-                                    SizedBox(width: 8),
-                                    Text('تعديل'),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.delete, color: Colors.red),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'حذف',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                _editService(service);
-                              } else if (value == 'delete') {
-                                _deleteService(service);
-                              }
-                            },
-                          ),
-                          onTap: () => _editService(service),
-                        ),
-                      );
-                    },
-                  ),
+          IconButton(
+            onPressed: _addSampleData,
+            icon: const Icon(Icons.add_chart),
+            tooltip: 'إضافة بيانات تجريبية',
+          ),
+          IconButton(
+            onPressed: _loadServices,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'تحديث',
           ),
         ],
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildSearchAndFilterBar(),
+            _buildServiceTypesGrid(),
+            _buildStatistics(),
+            _buildServicesList(),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addService,
@@ -355,7 +339,6 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Search Bar
           TextField(
             decoration: const InputDecoration(
               labelText: 'البحث',
@@ -371,11 +354,8 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
             },
           ),
           const SizedBox(height: 16),
-
-          // Filter and Sort Row
           Row(
             children: [
-              // Status Filter
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: _filterStatus,
@@ -397,37 +377,6 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
                 ),
               ),
               const SizedBox(width: 16),
-
-              // Service Type Filter
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _filterServiceType,
-                  decoration: const InputDecoration(
-                    labelText: 'نوع الخدمة',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    const DropdownMenuItem(value: 'all', child: Text('الكل')),
-                    ...BottomServiceConstants.serviceTypes
-                        .map(
-                          (type) => DropdownMenuItem(
-                            value: type['value'],
-                            child: Text(type['label']!),
-                          ),
-                        )
-                        .toList(),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _filterServiceType = value!;
-                    });
-                    _loadServices();
-                  },
-                ),
-              ),
-              const SizedBox(width: 16),
-
-              // Sort Dropdown
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: _sortBy,
@@ -464,14 +413,92 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
     );
   }
 
-  Widget _buildStatistics() {
-    final totalCount = _services.length;
-    final activeCount = _services.where((s) => s.isActive).length;
-    final inactiveCount = totalCount - activeCount;
-    final totalClicks = _services.fold(
-      0,
-      (sum, service) => sum + service.clicks,
+  Widget _buildServiceTypesGrid() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'أنواع الخدمات',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 1.2,
+            ),
+            itemCount: _serviceTypes.length,
+            itemBuilder: (context, index) {
+              final serviceType = _serviceTypes[index];
+              return _buildServiceTypeCard(serviceType);
+            },
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildServiceTypeCard(Map<String, dynamic> serviceType) {
+    final servicesCount = _services
+        .where((s) => s.serviceType == serviceType['type'])
+        .length;
+    final activeServicesCount = _services
+        .where((s) => s.serviceType == serviceType['type'] && s.isActive)
+        .length;
+
+    return Card(
+      elevation: 2,
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).pushNamed(serviceType['route']);
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _filterServiceType == serviceType['type']
+                  ? serviceType['color']
+                  : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(serviceType['icon'], size: 32, color: serviceType['color']),
+              const SizedBox(height: 8),
+              Text(
+                serviceType['title'],
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$activeServicesCount/$servicesCount نشط',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatistics() {
+    final totalServices = _services.length;
+    final activeServices = _services.where((s) => s.isActive).length;
+    final totalClicks = _services.fold<int>(0, (sum, s) => sum + s.clicks);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -480,26 +507,18 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
           Expanded(
             child: _buildStatCard(
               'إجمالي الخدمات',
-              totalCount.toString(),
+              totalServices.toString(),
               Icons.list,
+              Colors.blue,
             ),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: _buildStatCard(
-              'نشط',
-              activeCount.toString(),
+              'الخدمات النشطة',
+              activeServices.toString(),
               Icons.check_circle,
               Colors.green,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildStatCard(
-              'غير نشط',
-              inactiveCount.toString(),
-              Icons.cancel,
-              Colors.grey,
             ),
           ),
           const SizedBox(width: 16),
@@ -508,7 +527,7 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
               'إجمالي النقرات',
               totalClicks.toString(),
               Icons.touch_app,
-              Colors.blue,
+              Colors.orange,
             ),
           ),
         ],
@@ -519,15 +538,15 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
   Widget _buildStatCard(
     String title,
     String value,
-    IconData icon, [
-    Color? color,
-  ]) {
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 32),
+            Icon(icon, size: 32, color: color),
             const SizedBox(height: 8),
             Text(
               value,
@@ -535,7 +554,7 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
             ),
             Text(
               title,
-              style: const TextStyle(fontSize: 12),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
           ],
@@ -544,29 +563,150 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
     );
   }
 
+  Widget _buildServicesList() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _error!,
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadServices,
+              child: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_services.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Text('لا توجد خدمات', style: TextStyle(fontSize: 18)),
+        ),
+      );
+    }
+
+    return Column(
+      children: _services.map((service) => _buildServiceCard(service)).toList(),
+    );
+  }
+
+  Widget _buildServiceCard(BottomService service) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: _getColorFromString(service.color),
+          child: Icon(_getIconFromString(service.icon), color: Colors.white),
+        ),
+        title: Text(service.title.ar),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (service.description.ar.isNotEmpty)
+              Text(
+                service.description.ar,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getServiceTypeColor(service.serviceType),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _getServiceTypeLabel(service.serviceType),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'النقرات: ${service.clicks}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: service.isActive ? Colors.green : Colors.grey,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    service.isActive ? 'نشط' : 'غير نشط',
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            switch (value) {
+              case 'edit':
+                // TODO: Implement edit
+                break;
+              case 'delete':
+                // TODO: Implement delete
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(value: 'edit', child: Text('تعديل')),
+            const PopupMenuItem(value: 'delete', child: Text('حذف')),
+          ],
+        ),
+      ),
+    );
+  }
+
   Color _getColorFromString(String colorString) {
-    switch (colorString) {
-      case 'primaryColor':
-        return const Color(0xFF1976D2);
-      case 'syrianGreen':
-        return const Color(0xFF4CAF50);
-      case 'accentColor':
-        return const Color(0xFFFF5722);
-      case 'secondaryColor':
-        return const Color(0xFF424242);
-      case 'syrianGold':
-        return const Color(0xFFD4AF37);
-      case 'warningColor':
-        return const Color(0xFFFF9800);
-      case 'syrianRed':
-        return const Color(0xFFCE1126);
+    switch (colorString.toLowerCase()) {
+      case 'blue':
+        return Colors.blue;
+      case 'green':
+        return Colors.green;
+      case 'orange':
+        return Colors.orange;
+      case 'red':
+        return Colors.red;
+      case 'purple':
+        return Colors.purple;
+      case 'teal':
+        return Colors.teal;
+      case 'indigo':
+        return Colors.indigo;
+      case 'amber':
+        return Colors.amber;
       default:
-        return const Color(0xFF1976D2);
+        return Colors.grey;
     }
   }
 
   IconData _getIconFromString(String iconString) {
-    switch (iconString) {
+    switch (iconString.toLowerCase()) {
       case 'directions_car':
         return Icons.directions_car;
       case 'event':
@@ -583,33 +723,29 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
         return Icons.local_hospital;
       case 'notifications':
         return Icons.notifications;
-      case 'map':
-        return Icons.map;
-      case 'camera_alt':
-        return Icons.camera_alt;
-      case 'shopping_cart':
-        return Icons.shopping_cart;
-      case 'support':
-        return Icons.support;
-      case 'settings':
-        return Icons.settings;
-      case 'info':
-        return Icons.info;
-      case 'contact_support':
-        return Icons.contact_support;
       default:
-        return Icons.link;
+        return Icons.info;
     }
   }
 
   Color _getServiceTypeColor(String serviceType) {
     switch (serviceType) {
-      case 'internal':
+      case 'transportation':
         return Colors.blue;
-      case 'external':
+      case 'events':
         return Colors.green;
-      case 'custom':
+      case 'news':
         return Colors.orange;
+      case 'opportunities':
+        return Colors.purple;
+      case 'accommodation':
+        return Colors.amber;
+      case 'restaurants':
+        return Colors.red;
+      case 'facilities':
+        return Colors.teal;
+      case 'announcements':
+        return Colors.indigo;
       default:
         return Colors.grey;
     }
@@ -617,593 +753,24 @@ class _BottomServicesScreenState extends State<BottomServicesScreen> {
 
   String _getServiceTypeLabel(String serviceType) {
     switch (serviceType) {
-      case 'internal':
-        return 'داخلي';
-      case 'external':
-        return 'خارجي';
-      case 'custom':
-        return 'مخصص';
+      case 'transportation':
+        return 'النقل';
+      case 'events':
+        return 'الأحداث';
+      case 'news':
+        return 'الأخبار';
+      case 'opportunities':
+        return 'الفرص';
+      case 'accommodation':
+        return 'الإقامة';
+      case 'restaurants':
+        return 'المطاعم';
+      case 'facilities':
+        return 'المرافق';
+      case 'announcements':
+        return 'الإعلانات';
       default:
         return 'غير محدد';
-    }
-  }
-}
-
-class BottomServiceDialog extends StatefulWidget {
-  final BottomService? service;
-
-  const BottomServiceDialog({super.key, this.service});
-
-  @override
-  State<BottomServiceDialog> createState() => _BottomServiceDialogState();
-}
-
-class _BottomServiceDialogState extends State<BottomServiceDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final Map<String, TextEditingController> _titleControllers = {};
-  final Map<String, TextEditingController> _descriptionControllers = {};
-  final _routeController = TextEditingController();
-  final _externalUrlController = TextEditingController();
-  final _customActionController = TextEditingController();
-
-  String _selectedServiceType = 'internal';
-  String _selectedIcon = 'directions_car';
-  String _selectedColor = 'primaryColor';
-  int _displayOrder = 0;
-  bool _isActive = true;
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Initialize controllers for all languages
-    for (String lang in RecommendationConstants.supportedLanguages) {
-      _titleControllers[lang] = TextEditingController();
-      _descriptionControllers[lang] = TextEditingController();
-    }
-
-    if (widget.service != null) {
-      final service = widget.service!;
-      _selectedServiceType = service.serviceType;
-      _selectedIcon = service.icon;
-      _selectedColor = service.color;
-      _displayOrder = service.displayOrder;
-      _isActive = service.isActive;
-      _routeController.text = service.route;
-      _externalUrlController.text = service.externalUrl;
-      _customActionController.text = service.customAction;
-
-      // Set values for all languages
-      for (String lang in RecommendationConstants.supportedLanguages) {
-        _titleControllers[lang]!.text = service.title.getText(lang);
-        _descriptionControllers[lang]!.text = service.description.getText(lang);
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    for (var controller in _titleControllers.values) {
-      controller.dispose();
-    }
-    for (var controller in _descriptionControllers.values) {
-      controller.dispose();
-    }
-    _routeController.dispose();
-    _externalUrlController.dispose();
-    _customActionController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    // Validate based on service type
-    if (_selectedServiceType == 'internal' &&
-        _routeController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى إدخال المسار للخدمة الداخلية'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    if (_selectedServiceType == 'external' &&
-        _externalUrlController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى إدخال الرابط الخارجي'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    if (_selectedServiceType == 'custom' &&
-        _customActionController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى إدخال الإجراء المخصص'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final title = LocalizedText(
-        ar: _titleControllers['ar']!.text.trim(),
-        en: _titleControllers['en']!.text.trim(),
-        tr: _titleControllers['tr']!.text.trim(),
-        fr: _titleControllers['fr']!.text.trim(),
-        ru: _titleControllers['ru']!.text.trim(),
-        zh: _titleControllers['zh']!.text.trim(),
-      );
-
-      final description = LocalizedText(
-        ar: _descriptionControllers['ar']!.text.trim(),
-        en: _descriptionControllers['en']!.text.trim(),
-        tr: _descriptionControllers['tr']!.text.trim(),
-        fr: _descriptionControllers['fr']!.text.trim(),
-        ru: _descriptionControllers['ru']!.text.trim(),
-        zh: _descriptionControllers['zh']!.text.trim(),
-      );
-
-      final service = BottomService(
-        id: widget.service?.id ?? '',
-        title: title,
-        description: description,
-        serviceType: _selectedServiceType,
-        route: _routeController.text.trim(),
-        externalUrl: _externalUrlController.text.trim(),
-        customAction: _customActionController.text.trim(),
-        icon: _selectedIcon,
-        color: _selectedColor,
-        displayOrder: _displayOrder,
-        isActive: _isActive,
-        clicks: widget.service?.clicks ?? 0,
-        createdAt: widget.service?.createdAt ?? DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      if (widget.service == null) {
-        // Create new service
-        await FirebaseFirestore.instance
-            .collection(AppConstants.bottomServicesCollection)
-            .add(service.toFirestore());
-      } else {
-        // Update existing service
-        await FirebaseFirestore.instance
-            .collection(AppConstants.bottomServicesCollection)
-            .doc(widget.service!.id)
-            .update(service.toFirestore());
-      }
-
-      if (mounted) {
-        Navigator.of(context).pop(service);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.service == null
-                  ? 'تم إضافة الخدمة بنجاح'
-                  : 'تم تحديث الخدمة بنجاح',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('فشل في حفظ الخدمة: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          Expanded(
-            child: Text(
-              widget.service == null ? 'إضافة خدمة جديدة' : 'تعديل الخدمة',
-            ),
-          ),
-        ],
-      ),
-      content: SizedBox(
-        width: 600,
-        height: MediaQuery.of(context).size.height * 0.8,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Language Tabs
-                DefaultTabController(
-                  length: RecommendationConstants.supportedLanguages.length,
-                  child: Column(
-                    children: [
-                      TabBar(
-                        isScrollable: true,
-                        tabs: RecommendationConstants.languageNames
-                            .map((name) => Tab(text: name))
-                            .toList(),
-                      ),
-                      SizedBox(
-                        height: 200,
-                        child: TabBarView(
-                          children: RecommendationConstants.supportedLanguages
-                              .map((lang) => _buildLanguageForm(lang))
-                              .toList(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Service Type
-                DropdownButtonFormField<String>(
-                  value: _selectedServiceType,
-                  decoration: const InputDecoration(
-                    labelText: 'نوع الخدمة',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: BottomServiceConstants.serviceTypes
-                      .map(
-                        (type) => DropdownMenuItem(
-                          value: type['value'],
-                          child: Text(type['label']!),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedServiceType = value!;
-                    });
-                  },
-                ),
-
-                const SizedBox(height: 16),
-
-                // Route/URL/Action based on service type
-                _buildServiceTypeSpecificField(),
-
-                const SizedBox(height: 16),
-
-                // Icon, Color, and Display Order
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedIcon,
-                        decoration: const InputDecoration(
-                          labelText: 'الأيقونة',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: BottomServiceConstants.availableIcons
-                            .map(
-                              (icon) => DropdownMenuItem(
-                                value: icon['value'],
-                                child: Row(
-                                  children: [
-                                    Icon(_getIconFromString(icon['value']!)),
-                                    const SizedBox(width: 8),
-                                    Text(icon['label']!),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedIcon = value!;
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedColor,
-                        decoration: const InputDecoration(
-                          labelText: 'اللون',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: BottomServiceConstants.availableColors
-                            .map(
-                              (color) => DropdownMenuItem<String>(
-                                value: color['value'] as String,
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 20,
-                                      height: 20,
-                                      decoration: BoxDecoration(
-                                        color: color['color'] as Color,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(color['label'] as String),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedColor = value!;
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextFormField(
-                        initialValue: _displayOrder.toString(),
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'ترتيب العرض',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) {
-                          _displayOrder = int.tryParse(value) ?? 0;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // Active Status
-                Row(
-                  children: [
-                    const Text('الحالة:'),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Radio<bool>(
-                            value: true,
-                            groupValue: _isActive,
-                            onChanged: (value) {
-                              setState(() {
-                                _isActive = value!;
-                              });
-                            },
-                          ),
-                          const Text('نشط'),
-                          const SizedBox(width: 16),
-                          Radio<bool>(
-                            value: false,
-                            groupValue: _isActive,
-                            onChanged: (value) {
-                              setState(() {
-                                _isActive = value!;
-                              });
-                            },
-                          ),
-                          const Text('غير نشط'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('إلغاء'),
-        ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _save,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('حفظ'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLanguageForm(String languageCode) {
-    final languageName =
-        RecommendationConstants.languageNames[RecommendationConstants
-            .supportedLanguages
-            .indexOf(languageCode)];
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Text(
-            languageName,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-
-          TextFormField(
-            controller: _titleControllers[languageCode],
-            decoration: InputDecoration(
-              labelText: 'عنوان الخدمة ($languageName)',
-              border: const OutlineInputBorder(),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'يرجى إدخال عنوان الخدمة';
-              }
-              if (value.length > 50) {
-                return 'الحد الأقصى 50 حرف';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-
-          TextFormField(
-            controller: _descriptionControllers[languageCode],
-            maxLines: 2,
-            decoration: InputDecoration(
-              labelText: 'الوصف ($languageName) - اختياري',
-              border: const OutlineInputBorder(),
-            ),
-            validator: (value) {
-              if (value != null && value.length > 100) {
-                return 'الحد الأقصى 100 حرف';
-              }
-              return null;
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildServiceTypeSpecificField() {
-    switch (_selectedServiceType) {
-      case 'internal':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'المسار',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _routeController.text.isEmpty
-                  ? null
-                  : _routeController.text,
-              decoration: const InputDecoration(
-                labelText: 'اختر مساراً أو أدخل مساراً مخصصاً',
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                ...BottomServiceConstants.commonRoutes
-                    .map(
-                      (route) =>
-                          DropdownMenuItem(value: route, child: Text(route)),
-                    )
-                    .toList(),
-                const DropdownMenuItem(
-                  value: 'custom',
-                  child: Text('مسار مخصص'),
-                ),
-              ],
-              onChanged: (value) {
-                if (value == 'custom') {
-                  _routeController.text = '';
-                } else if (value != null) {
-                  _routeController.text = value;
-                }
-              },
-            ),
-            if (_routeController.text.isEmpty ||
-                !BottomServiceConstants.commonRoutes.contains(
-                  _routeController.text,
-                ))
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: TextFormField(
-                  controller: _routeController,
-                  decoration: const InputDecoration(
-                    labelText: 'المسار المخصص',
-                    border: OutlineInputBorder(),
-                    hintText: 'مثال: /custom-page',
-                  ),
-                ),
-              ),
-          ],
-        );
-      case 'external':
-        return TextFormField(
-          controller: _externalUrlController,
-          decoration: const InputDecoration(
-            labelText: 'الرابط الخارجي',
-            border: OutlineInputBorder(),
-            hintText: 'https://example.com',
-          ),
-        );
-      case 'custom':
-        return TextFormField(
-          controller: _customActionController,
-          decoration: const InputDecoration(
-            labelText: 'الإجراء المخصص',
-            border: OutlineInputBorder(),
-            hintText: 'مثال: open_settings, show_notifications',
-          ),
-        );
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  IconData _getIconFromString(String iconString) {
-    switch (iconString) {
-      case 'directions_car':
-        return Icons.directions_car;
-      case 'event':
-        return Icons.event;
-      case 'newspaper':
-        return Icons.newspaper;
-      case 'lightbulb_outline':
-        return Icons.lightbulb_outline;
-      case 'hotel':
-        return Icons.hotel;
-      case 'restaurant':
-        return Icons.restaurant;
-      case 'local_hospital':
-        return Icons.local_hospital;
-      case 'notifications':
-        return Icons.notifications;
-      case 'map':
-        return Icons.map;
-      case 'camera_alt':
-        return Icons.camera_alt;
-      case 'shopping_cart':
-        return Icons.shopping_cart;
-      case 'support':
-        return Icons.support;
-      case 'settings':
-        return Icons.settings;
-      case 'info':
-        return Icons.info;
-      case 'contact_support':
-        return Icons.contact_support;
-      default:
-        return Icons.link;
     }
   }
 }

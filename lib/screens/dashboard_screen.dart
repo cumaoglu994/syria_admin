@@ -227,11 +227,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'icon': Icons.route,
         'route': '/trip-suggestions',
       },
-      {
-        'title': 'الخدمات السفلية',
-        'icon': Icons.list,
-        'route': '/bottom-services',
-      },
+      {'title': 'الخدمات ', 'icon': Icons.list, 'route': '/bottom-services'},
       {'title': 'الحجوزات', 'icon': Icons.book_online, 'route': '/bookings'},
       {'title': 'المراجعات', 'icon': Icons.rate_review, 'route': '/reviews'},
       {
