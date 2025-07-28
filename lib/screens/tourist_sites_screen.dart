@@ -6,6 +6,196 @@ import 'dart:convert';
 import '../models/tourist_site.dart';
 import '../constants/app_constants.dart';
 
+// Custom Image Widget for better error handling
+class SmartImageWidget extends StatefulWidget {
+  final String imageUrl;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+  final Widget? placeholder;
+  final Widget? errorWidget;
+
+  const SmartImageWidget({
+    super.key,
+    required this.imageUrl,
+    this.width,
+    this.height,
+    this.fit = BoxFit.cover,
+    this.placeholder,
+    this.errorWidget,
+  });
+
+  @override
+  State<SmartImageWidget> createState() => _SmartImageWidgetState();
+}
+
+class _SmartImageWidgetState extends State<SmartImageWidget> {
+  bool _isLoading = true;
+  bool _hasError = false;
+  String? _processedUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _processImageUrl();
+  }
+
+  void _processImageUrl() {
+    String url = widget.imageUrl.trim();
+
+    // Handle different URL formats
+    if (url.startsWith('data:image/')) {
+      // Base64 image - already processed
+      _processedUrl = url;
+    } else if (url.startsWith('http://') || url.startsWith('https://')) {
+      // HTTP/HTTPS URL
+      _processedUrl = url;
+    } else if (url.startsWith('//')) {
+      // Protocol-relative URL
+      _processedUrl = 'https:$url';
+    } else if (url.startsWith('/')) {
+      // Absolute path - try common domains
+      _processedUrl = 'https://example.com$url';
+    } else if (url.contains('.') && !url.contains('://')) {
+      // URL without protocol - add https
+      _processedUrl = 'https://$url';
+    } else {
+      // Invalid URL format
+      print('Invalid image URL format: $url');
+      _processedUrl = url; // Keep original for error display
+    }
+
+    // Validate URL format
+    if (_processedUrl != null && !_processedUrl!.startsWith('data:image/')) {
+      try {
+        Uri.parse(_processedUrl!);
+      } catch (e) {
+        print('Invalid URL format: $_processedUrl');
+        _processedUrl = null;
+      }
+    }
+
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return _buildPlaceholder();
+    }
+
+    if (_hasError || _processedUrl == null) {
+      return _buildErrorWidget();
+    }
+
+    return Image.network(
+      _processedUrl!,
+      width: widget.width,
+      height: widget.height,
+      fit: widget.fit,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          return child;
+        }
+        return _buildLoadingWidget(loadingProgress);
+      },
+      errorBuilder: (context, error, stackTrace) {
+        print('Image loading error for URL: $_processedUrl');
+        print('Error: $error');
+        setState(() {
+          _hasError = true;
+        });
+        return _buildErrorWidget();
+      },
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      width: widget.width,
+      height: widget.height,
+      color: Colors.grey[300],
+      child:
+          widget.placeholder ??
+          const Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  Widget _buildLoadingWidget(ImageChunkEvent loadingProgress) {
+    return Container(
+      width: widget.width,
+      height: widget.height,
+      color: Colors.grey[300],
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                  : null,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'جاري التحميل...',
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Container(
+      width: widget.width,
+      height: widget.height,
+      color: widget.fit == BoxFit.contain ? Colors.grey[800] : Colors.grey[300],
+      child:
+          widget.errorWidget ??
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.broken_image,
+                  size: widget.width != null ? widget.width! * 0.3 : 50,
+                  color: widget.fit == BoxFit.contain
+                      ? Colors.white
+                      : Colors.grey[600],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'فشل في تحميل الصورة',
+                  style: TextStyle(
+                    color: widget.fit == BoxFit.contain
+                        ? Colors.white
+                        : Colors.grey[600],
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'URL: ${widget.imageUrl.substring(0, widget.imageUrl.length > 30 ? 30 : widget.imageUrl.length)}...',
+                  style: TextStyle(
+                    color: widget.fit == BoxFit.contain
+                        ? Colors.white70
+                        : Colors.grey[500],
+                    fontSize: 10,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+}
+
 class TouristSitesScreen extends StatefulWidget {
   const TouristSitesScreen({super.key});
 
@@ -327,104 +517,281 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
                       final site = _filteredSites[index];
                       return Card(
                         margin: const EdgeInsets.only(bottom: 16),
-                        child: ListTile(
-                          leading: site.images.isNotEmpty
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    site.images.first,
-                                    width: 60,
-                                    height: 60,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        width: 60,
-                                        height: 60,
-                                        color: Colors.grey[300],
-                                        child: const Icon(Icons.image),
-                                      );
-                                    },
-                                  ),
-                                )
-                              : Container(
-                                  width: 60,
-                                  height: 60,
-                                  color: Colors.grey[300],
-                                  child: const Icon(Icons.image),
-                                ),
-                          title: Text(site.name),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(site.city),
-                              Text(
-                                site.description,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.star,
-                                    size: 16,
-                                    color: Colors.amber[600],
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(site.rating.toString()),
-                                  const SizedBox(width: 16),
-                                  Icon(
-                                    Icons.location_on,
-                                    size: 16,
-                                    color: Colors.red[600],
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      '${site.latitude.toStringAsFixed(4)}, ${site.longitude.toStringAsFixed(4)}',
-                                      overflow: TextOverflow.ellipsis,
+                        elevation: 4,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Images section
+                            if (site.images.isNotEmpty)
+                              Container(
+                                height: 200,
+                                child: Stack(
+                                  children: [
+                                    PageView.builder(
+                                      itemCount: site.images.length,
+                                      itemBuilder: (context, imageIndex) {
+                                        return GestureDetector(
+                                          onTap: () => _showImageGallery(
+                                            context,
+                                            site,
+                                            imageIndex,
+                                          ),
+                                          child: Container(
+                                            width: double.infinity,
+                                            child: SmartImageWidget(
+                                              imageUrl: site.images[imageIndex],
+                                              width: double.infinity,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          ),
+                                        );
+                                      },
                                     ),
+                                    // Swipe hint overlay
+                                    if (site.images.length > 1)
+                                      Positioned(
+                                        bottom: 8,
+                                        left: 0,
+                                        right: 0,
+                                        child: Center(
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black54,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.swipe_left,
+                                                  color: Colors.white,
+                                                  size: 12,
+                                                ),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  'اسحب للتنقل',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 10,
+                                                  ),
+                                                ),
+                                                SizedBox(width: 4),
+                                                Icon(
+                                                  Icons.swipe_right,
+                                                  color: Colors.white,
+                                                  size: 12,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    // Image counter with swipe hint
+                                    if (site.images.length > 1)
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black54,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons.photo_library,
+                                                color: Colors.white,
+                                                size: 14,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '${site.images.length}',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              const Icon(
+                                                Icons.swipe,
+                                                color: Colors.white,
+                                                size: 12,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    // Edit button
+                                    Positioned(
+                                      top: 8,
+                                      left: 8,
+                                      child: GestureDetector(
+                                        onTap: () => _editSite(site),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.edit,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              Container(
+                                height: 200,
+                                color: Colors.grey[300],
+                                child: const Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.image,
+                                        size: 50,
+                                        color: Colors.grey,
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        'لا توجد صور',
+                                        style: TextStyle(color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            // Content section
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          site.name,
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      PopupMenuButton(
+                                        itemBuilder: (context) => [
+                                          const PopupMenuItem(
+                                            value: 'edit',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.edit),
+                                                SizedBox(width: 8),
+                                                Text('تعديل'),
+                                              ],
+                                            ),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'delete',
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.delete,
+                                                  color: Colors.red,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text(
+                                                  'حذف',
+                                                  style: TextStyle(
+                                                    color: Colors.red,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                        onSelected: (value) {
+                                          if (value == 'edit') {
+                                            _editSite(site);
+                                          } else if (value == 'delete') {
+                                            _deleteSite(site);
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.location_city,
+                                        size: 16,
+                                        color: Colors.blue[600],
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(site.city),
+                                      const SizedBox(width: 16),
+                                      Icon(
+                                        Icons.category,
+                                        size: 16,
+                                        color: Colors.green[600],
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(_getCategoryName(site.category)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    site.description,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.star,
+                                        size: 16,
+                                        color: Colors.amber[600],
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(site.rating.toString()),
+                                      const SizedBox(width: 16),
+                                      Icon(
+                                        Icons.attach_money,
+                                        size: 16,
+                                        color: Colors.green[600],
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${site.price.toStringAsFixed(0)} ل.س',
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                          trailing: PopupMenuButton(
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.edit),
-                                    SizedBox(width: 8),
-                                    Text('تعديل'),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.delete, color: Colors.red),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'حذف',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                _editSite(site);
-                              } else if (value == 'delete') {
-                                _deleteSite(site);
-                              }
-                            },
-                          ),
-                          onTap: () => _editSite(site),
+                            ),
+                          ],
                         ),
                       );
                     },
@@ -437,6 +804,77 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
         child: const Icon(Icons.add),
       ),
     );
+  }
+
+  void _showImageGallery(
+    BuildContext context,
+    TouristSite site,
+    int initialIndex,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _ImageGalleryScreen(
+          site: site,
+          initialIndex: initialIndex,
+          onEdit: () => _editSite(site),
+          onDelete: (index) => _deleteImage(site, index),
+        ),
+      ),
+    );
+  }
+
+  void _deleteImage(TouristSite site, int imageIndex) async {
+    try {
+      final updatedImages = List<String>.from(site.images);
+      updatedImages.removeAt(imageIndex);
+
+      await FirebaseFirestore.instance
+          .collection(AppConstants.touristSitesCollection)
+          .doc(site.id)
+          .update({'images': updatedImages});
+
+      // Refresh the list
+      _loadSites();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حذف الصورة بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل في حذف الصورة: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getCategoryName(String categoryId) {
+    switch (categoryId) {
+      case 'archaeological':
+        return 'المواقع الأثرية';
+      case 'religious':
+        return 'الأماكن الدينية';
+      case 'museums':
+        return 'المتاحف';
+      case 'parks':
+        return 'الحدائق';
+      case 'beaches':
+        return 'الشواطئ';
+      case 'markets':
+        return 'الأسواق';
+      case 'castle':
+        return 'القلاع';
+      default:
+        return 'غير محدد';
+    }
   }
 }
 
@@ -463,8 +901,8 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
   double _rating = 0.0;
   double _latitude = 0.0;
   double _longitude = 0.0;
-  List<File> _selectedImages = [];
-  List<String> _existingImages = [];
+  List<String> _imageUrls = [];
+  TextEditingController _imageUrlController = TextEditingController();
   bool _isLoading = false;
 
   @override
@@ -482,7 +920,7 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
       _rating = widget.site!.rating;
       _latitude = widget.site!.latitude;
       _longitude = widget.site!.longitude;
-      _existingImages = List.from(widget.site!.images);
+      _imageUrls = List.from(widget.site!.images);
     }
   }
 
@@ -497,40 +935,67 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
     super.dispose();
   }
 
-  Future<void> _pickImages() async {
-    final List<XFile> images = await ImagePicker().pickMultiImage();
-    if (images.isNotEmpty) {
-      setState(() {
-        _selectedImages.addAll(images.map((xFile) => File(xFile.path)));
-      });
-    }
-  }
+  void _addImageUrl() {
+    final url = _imageUrlController.text.trim();
+    if (url.isNotEmpty) {
+      // Validate URL format
+      String processedUrl = url;
 
-  Future<void> _removeImage(int index) async {
-    setState(() {
-      if (index < _existingImages.length) {
-        _existingImages.removeAt(index);
-      } else {
-        _selectedImages.removeAt(index - _existingImages.length);
+      // Handle different URL formats
+      if (!url.startsWith('http://') &&
+          !url.startsWith('https://') &&
+          !url.startsWith('data:image/')) {
+        if (url.startsWith('//')) {
+          processedUrl = 'https:$url';
+        } else if (url.startsWith('/')) {
+          processedUrl = 'https://example.com$url';
+        } else if (url.contains('.') && !url.contains('://')) {
+          processedUrl = 'https://$url';
+        }
       }
-    });
-  }
 
-  Future<List<String>> _uploadImages() async {
-    List<String> imageUrls = [];
-
-    for (File image in _selectedImages) {
+      // Validate URL
       try {
-        // Convert image to base64
-        final bytes = await image.readAsBytes();
-        final base64String = base64Encode(bytes);
-        imageUrls.add('data:image/jpeg;base64,$base64String');
-      } catch (e) {
-        print('Failed to convert image to base64: $e');
-      }
-    }
+        if (!processedUrl.startsWith('data:image/')) {
+          Uri.parse(processedUrl);
+        }
 
-    return imageUrls;
+        setState(() {
+          _imageUrls.add(processedUrl);
+          _imageUrlController.clear();
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إضافة رابط الصورة بنجاح'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('رابط الصورة غير صحيح: $url'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى إدخال رابط الصورة'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  void _removeImageUrl(int index) {
+    setState(() {
+      _imageUrls.removeAt(index);
+    });
   }
 
   Future<void> _save() async {
@@ -541,9 +1006,6 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
     });
 
     try {
-      final newImageUrls = await _uploadImages();
-      final allImages = [..._existingImages, ...newImageUrls];
-
       final site = TouristSite(
         id: widget.site?.id ?? '',
         name: _nameController.text.trim(),
@@ -557,7 +1019,7 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
         rating: _rating,
         latitude: _latitude,
         longitude: _longitude,
-        images: allImages,
+        images: _imageUrls,
         createdAt: widget.site?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -813,25 +1275,44 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
 
                 // Images section
                 const Text(
-                  'الصور',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  'روابط الصور',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-
-                // Existing images
-                if (_existingImages.isNotEmpty)
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _imageUrlController,
+                        decoration: const InputDecoration(
+                          hintText:
+                              'أدخل رابط الصورة (https://example.com/image.jpg)',
+                          helperText:
+                              'يدعم: HTTP/HTTPS URLs, Base64, ve الصور المحلية',
+                          border: OutlineInputBorder(),
+                        ),
+                        onSubmitted: (value) => _addImageUrl(),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add_link),
+                      onPressed: _addImageUrl,
+                    ),
+                  ],
+                ),
+                if (_imageUrls.isNotEmpty)
                   SizedBox(
                     height: 100,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemCount: _existingImages.length,
+                      itemCount: _imageUrls.length,
                       itemBuilder: (context, index) {
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: Stack(
                             children: [
-                              Image.network(
-                                _existingImages[index],
+                              SmartImageWidget(
+                                imageUrl: _imageUrls[index],
                                 width: 100,
                                 height: 100,
                                 fit: BoxFit.cover,
@@ -840,7 +1321,7 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
                                 top: 4,
                                 right: 4,
                                 child: GestureDetector(
-                                  onTap: () => _removeImage(index),
+                                  onTap: () => _removeImageUrl(index),
                                   child: Container(
                                     padding: const EdgeInsets.all(4),
                                     decoration: const BoxDecoration(
@@ -861,59 +1342,6 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
                       },
                     ),
                   ),
-
-                // New images
-                if (_selectedImages.isNotEmpty)
-                  SizedBox(
-                    height: 100,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _selectedImages.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: Stack(
-                            children: [
-                              Image.file(
-                                _selectedImages[index],
-                                width: 100,
-                                height: 100,
-                                fit: BoxFit.cover,
-                              ),
-                              Positioned(
-                                top: 4,
-                                right: 4,
-                                child: GestureDetector(
-                                  onTap: () => _removeImage(
-                                    _existingImages.length + index,
-                                  ),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.close,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  onPressed: _pickImages,
-                  icon: const Icon(Icons.add_photo_alternate),
-                  label: const Text('إضافة صور'),
-                ),
               ],
             ),
           ),
@@ -935,6 +1363,266 @@ class _TouristSiteDialogState extends State<TouristSiteDialog> {
               : Text(widget.site == null ? 'إضافة' : 'حفظ'),
         ),
       ],
+    );
+  }
+}
+
+class _ImageGalleryScreen extends StatefulWidget {
+  final TouristSite site;
+  final int initialIndex;
+  final VoidCallback onEdit;
+  final Function(int) onDelete;
+
+  const _ImageGalleryScreen({
+    required this.site,
+    required this.initialIndex,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  State<_ImageGalleryScreen> createState() => _ImageGalleryScreenState();
+}
+
+class _ImageGalleryScreenState extends State<_ImageGalleryScreen> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _showDeleteDialog(int index) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف الصورة'),
+        content: const Text('هل أنت متأكد من حذف هذه الصورة؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              widget.onDelete(index);
+              Navigator.of(context).pop();
+            },
+            child: const Text('حذف', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          widget.site.name,
+          style: const TextStyle(color: Colors.white),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit, color: Colors.white),
+            onPressed: () {
+              Navigator.of(context).pop();
+              widget.onEdit();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.red),
+            onPressed: () => _showDeleteDialog(_currentIndex),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            itemCount: widget.site.images.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              return GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Center(
+                  child: InteractiveViewer(
+                    child: SmartImageWidget(
+                      imageUrl: widget.site.images[index],
+                      width: double.infinity,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // Navigation arrows
+          if (widget.site.images.length > 1) ...[
+            // Previous button
+            if (_currentIndex > 0)
+              Positioned(
+                left: 20,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      _pageController.previousPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: const Icon(
+                        Icons.chevron_left,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Next button
+            if (_currentIndex < widget.site.images.length - 1)
+              Positioned(
+                right: 20,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      _pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: const Icon(
+                        Icons.chevron_right,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+
+          // Image counter with dots
+          if (widget.site.images.length > 1)
+            Positioned(
+              bottom: 20,
+              left: 0,
+              right: 0,
+              child: Column(
+                children: [
+                  // Dots indicator
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      widget.site.images.length,
+                      (index) => Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _currentIndex == index
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Counter text
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${_currentIndex + 1} من ${widget.site.images.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Swipe hint
+          if (widget.site.images.length > 1)
+            Positioned(
+              top: 20,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.swipe_left, color: Colors.white, size: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        'اسحب للتنقل بين الصور',
+                        style: TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                      SizedBox(width: 8),
+                      Icon(Icons.swipe_right, color: Colors.white, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
