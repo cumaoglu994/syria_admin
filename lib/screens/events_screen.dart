@@ -3,8 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/event.dart';
 import '../constants/app_constants.dart';
 
-// Custom Image Widget for better error handling
-class SmartImageWidget extends StatefulWidget {
+// Simple Image Widget for better error handling
+class SmartImageWidget extends StatelessWidget {
   final String imageUrl;
   final double? width;
   final double? height;
@@ -23,75 +23,12 @@ class SmartImageWidget extends StatefulWidget {
   });
 
   @override
-  State<SmartImageWidget> createState() => _SmartImageWidgetState();
-}
-
-class _SmartImageWidgetState extends State<SmartImageWidget> {
-  bool _isLoading = true;
-  bool _hasError = false;
-  String? _processedUrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _processImageUrl();
-  }
-
-  void _processImageUrl() {
-    String url = widget.imageUrl.trim();
-
-    // Handle different URL formats
-    if (url.startsWith('data:image/')) {
-      // Base64 image - already processed
-      _processedUrl = url;
-    } else if (url.startsWith('http://') || url.startsWith('https://')) {
-      // HTTP/HTTPS URL
-      _processedUrl = url;
-    } else if (url.startsWith('//')) {
-      // Protocol-relative URL
-      _processedUrl = 'https:$url';
-    } else if (url.startsWith('/')) {
-      // Absolute path - try common domains
-      _processedUrl = 'https://example.com$url';
-    } else if (url.contains('.') && !url.contains('://')) {
-      // URL without protocol - add https
-      _processedUrl = 'https://$url';
-    } else {
-      // Invalid URL format
-      print('Invalid image URL format: $url');
-      _processedUrl = url; // Keep original for error display
-    }
-
-    // Validate URL format
-    if (_processedUrl != null && !_processedUrl!.startsWith('data:image/')) {
-      try {
-        Uri.parse(_processedUrl!);
-      } catch (e) {
-        print('Invalid URL format: $_processedUrl');
-        _processedUrl = null;
-      }
-    }
-
-    setState(() {
-      _isLoading = false;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return _buildPlaceholder();
-    }
-
-    if (_hasError || _processedUrl == null) {
-      return _buildErrorWidget();
-    }
-
     return Image.network(
-      _processedUrl!,
-      width: widget.width,
-      height: widget.height,
-      fit: widget.fit,
+      imageUrl,
+      width: width,
+      height: height,
+      fit: fit,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) {
           return child;
@@ -99,31 +36,15 @@ class _SmartImageWidgetState extends State<SmartImageWidget> {
         return _buildLoadingWidget(loadingProgress);
       },
       errorBuilder: (context, error, stackTrace) {
-        print('Image loading error for URL: $_processedUrl');
-        print('Error: $error');
-        setState(() {
-          _hasError = true;
-        });
         return _buildErrorWidget();
       },
     );
   }
 
-  Widget _buildPlaceholder() {
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      color: Colors.grey[300],
-      child:
-          widget.placeholder ??
-          const Center(child: CircularProgressIndicator()),
-    );
-  }
-
   Widget _buildLoadingWidget(ImageChunkEvent loadingProgress) {
     return Container(
-      width: widget.width,
-      height: widget.height,
+      width: width,
+      height: height,
       color: Colors.grey[300],
       child: Center(
         child: Column(
@@ -148,19 +69,19 @@ class _SmartImageWidgetState extends State<SmartImageWidget> {
 
   Widget _buildErrorWidget() {
     return Container(
-      width: widget.width,
-      height: widget.height,
-      color: widget.fit == BoxFit.contain ? Colors.grey[800] : Colors.grey[300],
+      width: width,
+      height: height,
+      color: fit == BoxFit.contain ? Colors.grey[800] : Colors.grey[300],
       child:
-          widget.errorWidget ??
+          errorWidget ??
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   Icons.broken_image,
-                  size: widget.width != null ? widget.width! * 0.3 : 50,
-                  color: widget.fit == BoxFit.contain
+                  size: width != null ? width! * 0.3 : 50,
+                  color: fit == BoxFit.contain
                       ? Colors.white
                       : Colors.grey[600],
                 ),
@@ -168,7 +89,7 @@ class _SmartImageWidgetState extends State<SmartImageWidget> {
                 Text(
                   'فشل في تحميل الصورة',
                   style: TextStyle(
-                    color: widget.fit == BoxFit.contain
+                    color: fit == BoxFit.contain
                         ? Colors.white
                         : Colors.grey[600],
                     fontSize: 12,
@@ -177,9 +98,9 @@ class _SmartImageWidgetState extends State<SmartImageWidget> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'URL: ${widget.imageUrl.substring(0, widget.imageUrl.length > 30 ? 30 : widget.imageUrl.length)}...',
+                  'URL: ${imageUrl.substring(0, imageUrl.length > 30 ? 30 : imageUrl.length)}...',
                   style: TextStyle(
-                    color: widget.fit == BoxFit.contain
+                    color: fit == BoxFit.contain
                         ? Colors.white70
                         : Colors.grey[500],
                     fontSize: 10,
@@ -393,7 +314,8 @@ class _EventsScreenState extends State<EventsScreen> {
         title: const Text('إدارة الأحداث'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () =>
+              Navigator.of(context).pushReplacementNamed('/dashboard'),
         ),
         actions: [
           IconButton(
@@ -403,55 +325,54 @@ class _EventsScreenState extends State<EventsScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Search Bar
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              decoration: const InputDecoration(
-                labelText: 'البحث في الأحداث...',
-                hintText: 'ابحث بالعنوان أو الوصف أو الموقع',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadEvents,
+                    child: const Text('إعادة المحاولة'),
+                  ),
+                ],
               ),
-              onChanged: _onSearchChanged,
-            ),
-          ),
-
-          // Statistics
-          _buildStatistics(),
-
-          // Events List
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _error!,
-                          style: const TextStyle(color: Colors.red),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadEvents,
-                          child: const Text('إعادة المحاولة'),
-                        ),
-                      ],
+            )
+          : _filteredEvents.isEmpty
+          ? const Center(
+              child: Text('لا توجد أحداث', style: TextStyle(fontSize: 18)),
+            )
+          : SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Search Bar
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      decoration: const InputDecoration(
+                        labelText: 'البحث في الأحداث...',
+                        hintText: 'ابحث بالعنوان أو الوصف أو الموقع',
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: _onSearchChanged,
                     ),
-                  )
-                : _filteredEvents.isEmpty
-                ? const Center(
-                    child: Text(
-                      'لا توجد أحداث',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                  )
-                : ListView.builder(
+                  ),
+
+                  // Statistics
+                  _buildStatistics(),
+
+                  // Events List
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     itemCount: _filteredEvents.length,
                     itemBuilder: (context, index) {
@@ -752,9 +673,9 @@ class _EventsScreenState extends State<EventsScreen> {
                       );
                     },
                   ),
-          ),
-        ],
-      ),
+                ],
+              ),
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addEvent,
         child: const Icon(Icons.add),
@@ -1158,49 +1079,18 @@ class _EventDialogState extends State<EventDialog> {
   void _addImageUrl() {
     final url = _imageUrlController.text.trim();
     if (url.isNotEmpty) {
-      // Validate URL format
-      String processedUrl = url;
+      setState(() {
+        _imageUrls.add(url);
+        _imageUrlController.clear();
+      });
 
-      // Handle different URL formats
-      if (!url.startsWith('http://') &&
-          !url.startsWith('https://') &&
-          !url.startsWith('data:image/')) {
-        if (url.startsWith('//')) {
-          processedUrl = 'https:$url';
-        } else if (url.startsWith('/')) {
-          processedUrl = 'https://example.com$url';
-        } else if (url.contains('.') && !url.contains('://')) {
-          processedUrl = 'https://$url';
-        }
-      }
-
-      // Validate URL
-      try {
-        if (!processedUrl.startsWith('data:image/')) {
-          Uri.parse(processedUrl);
-        }
-
-        setState(() {
-          _imageUrls.add(processedUrl);
-          _imageUrlController.clear();
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم إضافة رابط الصورة بنجاح'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 1),
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('رابط الصورة غير صحيح: $url'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إضافة رابط الصورة بنجاح'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 1),
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

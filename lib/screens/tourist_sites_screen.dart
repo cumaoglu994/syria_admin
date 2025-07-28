@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'dart:convert';
 import '../models/tourist_site.dart';
 import '../constants/app_constants.dart';
 
-// Custom Image Widget for better error handling
-class SmartImageWidget extends StatefulWidget {
+// Simple Image Widget for better error handling
+class SmartImageWidget extends StatelessWidget {
   final String imageUrl;
   final double? width;
   final double? height;
@@ -26,75 +23,12 @@ class SmartImageWidget extends StatefulWidget {
   });
 
   @override
-  State<SmartImageWidget> createState() => _SmartImageWidgetState();
-}
-
-class _SmartImageWidgetState extends State<SmartImageWidget> {
-  bool _isLoading = true;
-  bool _hasError = false;
-  String? _processedUrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _processImageUrl();
-  }
-
-  void _processImageUrl() {
-    String url = widget.imageUrl.trim();
-
-    // Handle different URL formats
-    if (url.startsWith('data:image/')) {
-      // Base64 image - already processed
-      _processedUrl = url;
-    } else if (url.startsWith('http://') || url.startsWith('https://')) {
-      // HTTP/HTTPS URL
-      _processedUrl = url;
-    } else if (url.startsWith('//')) {
-      // Protocol-relative URL
-      _processedUrl = 'https:$url';
-    } else if (url.startsWith('/')) {
-      // Absolute path - try common domains
-      _processedUrl = 'https://example.com$url';
-    } else if (url.contains('.') && !url.contains('://')) {
-      // URL without protocol - add https
-      _processedUrl = 'https://$url';
-    } else {
-      // Invalid URL format
-      print('Invalid image URL format: $url');
-      _processedUrl = url; // Keep original for error display
-    }
-
-    // Validate URL format
-    if (_processedUrl != null && !_processedUrl!.startsWith('data:image/')) {
-      try {
-        Uri.parse(_processedUrl!);
-      } catch (e) {
-        print('Invalid URL format: $_processedUrl');
-        _processedUrl = null;
-      }
-    }
-
-    setState(() {
-      _isLoading = false;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return _buildPlaceholder();
-    }
-
-    if (_hasError || _processedUrl == null) {
-      return _buildErrorWidget();
-    }
-
     return Image.network(
-      _processedUrl!,
-      width: widget.width,
-      height: widget.height,
-      fit: widget.fit,
+      imageUrl,
+      width: width,
+      height: height,
+      fit: fit,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) {
           return child;
@@ -102,31 +36,15 @@ class _SmartImageWidgetState extends State<SmartImageWidget> {
         return _buildLoadingWidget(loadingProgress);
       },
       errorBuilder: (context, error, stackTrace) {
-        print('Image loading error for URL: $_processedUrl');
-        print('Error: $error');
-        setState(() {
-          _hasError = true;
-        });
         return _buildErrorWidget();
       },
     );
   }
 
-  Widget _buildPlaceholder() {
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      color: Colors.grey[300],
-      child:
-          widget.placeholder ??
-          const Center(child: CircularProgressIndicator()),
-    );
-  }
-
   Widget _buildLoadingWidget(ImageChunkEvent loadingProgress) {
     return Container(
-      width: widget.width,
-      height: widget.height,
+      width: width,
+      height: height,
       color: Colors.grey[300],
       child: Center(
         child: Column(
@@ -151,19 +69,19 @@ class _SmartImageWidgetState extends State<SmartImageWidget> {
 
   Widget _buildErrorWidget() {
     return Container(
-      width: widget.width,
-      height: widget.height,
-      color: widget.fit == BoxFit.contain ? Colors.grey[800] : Colors.grey[300],
+      width: width,
+      height: height,
+      color: fit == BoxFit.contain ? Colors.grey[800] : Colors.grey[300],
       child:
-          widget.errorWidget ??
+          errorWidget ??
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   Icons.broken_image,
-                  size: widget.width != null ? widget.width! * 0.3 : 50,
-                  color: widget.fit == BoxFit.contain
+                  size: width != null ? width! * 0.3 : 50,
+                  color: fit == BoxFit.contain
                       ? Colors.white
                       : Colors.grey[600],
                 ),
@@ -171,7 +89,7 @@ class _SmartImageWidgetState extends State<SmartImageWidget> {
                 Text(
                   'فشل في تحميل الصورة',
                   style: TextStyle(
-                    color: widget.fit == BoxFit.contain
+                    color: fit == BoxFit.contain
                         ? Colors.white
                         : Colors.grey[600],
                     fontSize: 12,
@@ -180,9 +98,9 @@ class _SmartImageWidgetState extends State<SmartImageWidget> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'URL: ${widget.imageUrl.substring(0, widget.imageUrl.length > 30 ? 30 : widget.imageUrl.length)}...',
+                  'URL: ${imageUrl.substring(0, imageUrl.length > 30 ? 30 : imageUrl.length)}...',
                   style: TextStyle(
-                    color: widget.fit == BoxFit.contain
+                    color: fit == BoxFit.contain
                         ? Colors.white70
                         : Colors.grey[500],
                     fontSize: 10,
@@ -205,12 +123,12 @@ class TouristSitesScreen extends StatefulWidget {
 
 class _TouristSitesScreenState extends State<TouristSitesScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final ImagePicker _picker = ImagePicker();
   List<TouristSite> _sites = [];
   List<TouristSite> _filteredSites = [];
   bool _isLoading = true;
   String? _error;
-  String _selectedCategory = 'all';
+  String _searchQuery = '';
+  String _selectedCategory = '';
 
   @override
   void initState() {
@@ -248,132 +166,46 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
   }
 
   void _filterSites() {
-    if (_selectedCategory == 'all') {
-      _filteredSites = List.from(_sites);
-    } else {
-      _filteredSites = _sites
+    List<TouristSite> filtered = List.from(_sites);
+
+    // Category filter
+    if (_selectedCategory.isNotEmpty) {
+      filtered = filtered
           .where((site) => site.category == _selectedCategory)
           .toList();
     }
+
+    // Search filter
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered
+          .where(
+            (site) =>
+                site.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                site.description.toLowerCase().contains(
+                  _searchQuery.toLowerCase(),
+                ) ||
+                site.city.toLowerCase().contains(_searchQuery.toLowerCase()),
+          )
+          .toList();
+    }
+
+    setState(() {
+      _filteredSites = filtered;
+    });
   }
 
-  void _onCategoryChanged(String category) {
+  void _onSearchChanged(String query) {
     setState(() {
-      _selectedCategory = category;
+      _searchQuery = query;
     });
     _filterSites();
   }
 
-  Widget _buildCategoriesSection() {
-    final categories = [
-      {
-        'id': 'all',
-        'name': 'الكل',
-        'icon': Icons.all_inclusive,
-        'color': Colors.blue,
-      },
-      {
-        'id': 'archaeological',
-        'name': 'المواقع الأثرية',
-        'icon': Icons.architecture,
-        'color': Colors.amber,
-      },
-      {
-        'id': 'religious',
-        'name': 'الأماكن الدينية',
-        'icon': Icons.church,
-        'color': Colors.green,
-      },
-      {
-        'id': 'museums',
-        'name': 'المتاحف',
-        'icon': Icons.museum,
-        'color': Colors.red,
-      },
-      {
-        'id': 'parks',
-        'name': 'الحدائق',
-        'icon': Icons.park,
-        'color': Colors.teal,
-      },
-      {
-        'id': 'beaches',
-        'name': 'الشواطئ',
-        'icon': Icons.beach_access,
-        'color': Colors.orange,
-      },
-      {
-        'id': 'markets',
-        'name': 'الأسواق',
-        'icon': Icons.store,
-        'color': Colors.grey,
-      },
-      {
-        'id': 'castle',
-        'name': 'القلاع',
-        'icon': Icons.castle,
-        'color': Colors.purple,
-      },
-    ];
-
-    return Container(
-      height: 120,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: categories.length,
-        itemBuilder: (context, index) {
-          final category = categories[index];
-          final isSelected = _selectedCategory == category['id'];
-
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            child: Column(
-              children: [
-                GestureDetector(
-                  onTap: () => _onCategoryChanged(category['id'] as String),
-                  child: Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? category['color'] as Color
-                          : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(30),
-                      border: isSelected
-                          ? Border.all(
-                              color: category['color'] as Color,
-                              width: 2,
-                            )
-                          : null,
-                    ),
-                    child: Icon(
-                      category['icon'] as IconData,
-                      color: isSelected ? Colors.white : Colors.grey[600],
-                      size: 24,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  category['name'] as String,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isSelected
-                        ? category['color'] as Color
-                        : Colors.grey[600],
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
+  void _onCategoryChanged(String? category) {
+    setState(() {
+      _selectedCategory = category ?? '';
+    });
+    _filterSites();
   }
 
   Future<void> _addSite() async {
@@ -420,21 +252,6 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
 
     if (confirmed == true) {
       try {
-        // Delete images from storage
-        for (String imageUrl in site.images) {
-          try {
-            // This part of the code was removed as per the edit hint.
-            // The original code used FirebaseStorage.instance.refFromURL(imageUrl).delete();
-            // This functionality is no longer available.
-            // The user's edit hint implies a change in storage mechanism,
-            // but the new_code does not provide the replacement for this line.
-            // Therefore, it is removed as per the new_code.
-          } catch (e) {
-            print('Failed to delete image: $e');
-          }
-        }
-
-        // Delete document
         await _firestore
             .collection(AppConstants.touristSitesCollection)
             .doc(site.id)
@@ -462,6 +279,56 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
     }
   }
 
+  void _showImageGallery(
+    BuildContext context,
+    TouristSite site,
+    int initialIndex,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _ImageGalleryScreen(
+          site: site,
+          initialIndex: initialIndex,
+          onEdit: () => _editSite(site),
+          onDelete: (index) => _deleteImage(site, index),
+        ),
+      ),
+    );
+  }
+
+  void _deleteImage(TouristSite site, int imageIndex) async {
+    try {
+      final updatedImages = List<String>.from(site.images);
+      updatedImages.removeAt(imageIndex);
+
+      await FirebaseFirestore.instance
+          .collection(AppConstants.touristSitesCollection)
+          .doc(site.id)
+          .update({'images': updatedImages});
+
+      // Refresh the list
+      _loadSites();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حذف الصورة بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل في حذف الصورة: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -473,13 +340,56 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
               Navigator.of(context).pushReplacementNamed('/dashboard'),
         ),
         actions: [
-          IconButton(onPressed: _loadSites, icon: const Icon(Icons.refresh)),
+          IconButton(
+            onPressed: _loadSites,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'تحديث',
+          ),
         ],
       ),
       body: Column(
         children: [
-          // Categories Section
-          _buildCategoriesSection(),
+          // Search and Filter Bar
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'البحث في المواقع السياحية...',
+                    hintText: 'ابحث بالاسم أو الوصف أو الموقع',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: _onSearchChanged,
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'الفئة',
+                    border: OutlineInputBorder(),
+                  ),
+                  value: _selectedCategory.isEmpty ? null : _selectedCategory,
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('جميع الفئات'),
+                    ),
+                    ...AppConstants.categories.map(
+                      (category) => DropdownMenuItem(
+                        value: category,
+                        child: Text(category),
+                      ),
+                    ),
+                  ],
+                  onChanged: _onCategoryChanged,
+                ),
+              ],
+            ),
+          ),
+
+          // Statistics
+          _buildStatistics(),
 
           // Sites List
           Expanded(
@@ -506,7 +416,7 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
                 : _filteredSites.isEmpty
                 ? const Center(
                     child: Text(
-                      'لا توجد مواقع سياحية في هذه الفئة',
+                      'لا توجد مواقع سياحية',
                       style: TextStyle(fontSize: 18),
                     ),
                   )
@@ -743,17 +653,17 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
                                   Row(
                                     children: [
                                       Icon(
-                                        Icons.location_city,
+                                        Icons.location_on,
                                         size: 16,
-                                        color: Colors.blue[600],
+                                        color: Colors.red[600],
                                       ),
                                       const SizedBox(width: 4),
-                                      Text(site.city),
+                                      Expanded(child: Text(site.city)),
                                       const SizedBox(width: 16),
                                       Icon(
                                         Icons.category,
                                         size: 16,
-                                        color: Colors.green[600],
+                                        color: Colors.blue[600],
                                       ),
                                       const SizedBox(width: 4),
                                       Text(_getCategoryName(site.category)),
@@ -765,28 +675,6 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(color: Colors.grey[600]),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.star,
-                                        size: 16,
-                                        color: Colors.amber[600],
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(site.rating.toString()),
-                                      const SizedBox(width: 16),
-                                      Icon(
-                                        Icons.attach_money,
-                                        size: 16,
-                                        color: Colors.green[600],
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '${site.price.toStringAsFixed(0)} ل.س',
-                                      ),
-                                    ],
                                   ),
                                 ],
                               ),
@@ -806,564 +694,84 @@ class _TouristSitesScreenState extends State<TouristSitesScreen> {
     );
   }
 
-  void _showImageGallery(
-    BuildContext context,
-    TouristSite site,
-    int initialIndex,
-  ) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => _ImageGalleryScreen(
-          site: site,
-          initialIndex: initialIndex,
-          onEdit: () => _editSite(site),
-          onDelete: (index) => _deleteImage(site, index),
-        ),
-      ),
+  Widget _buildStatistics() {
+    final totalSites = _filteredSites.length;
+    final totalImages = _filteredSites.fold<int>(
+      0,
+      (sum, site) => sum + site.images.length,
     );
-  }
+    final categories = _filteredSites
+        .map((site) => site.category)
+        .toSet()
+        .length;
 
-  void _deleteImage(TouristSite site, int imageIndex) async {
-    try {
-      final updatedImages = List<String>.from(site.images);
-      updatedImages.removeAt(imageIndex);
-
-      await FirebaseFirestore.instance
-          .collection(AppConstants.touristSitesCollection)
-          .doc(site.id)
-          .update({'images': updatedImages});
-
-      // Refresh the list
-      _loadSites();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم حذف الصورة بنجاح'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('فشل في حذف الصورة: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  String _getCategoryName(String categoryId) {
-    switch (categoryId) {
-      case 'archaeological':
-        return 'المواقع الأثرية';
-      case 'religious':
-        return 'الأماكن الدينية';
-      case 'museums':
-        return 'المتاحف';
-      case 'parks':
-        return 'الحدائق';
-      case 'beaches':
-        return 'الشواطئ';
-      case 'markets':
-        return 'الأسواق';
-      case 'castle':
-        return 'القلاع';
-      default:
-        return 'غير محدد';
-    }
-  }
-}
-
-class TouristSiteDialog extends StatefulWidget {
-  final TouristSite? site;
-
-  const TouristSiteDialog({super.key, this.site});
-
-  @override
-  State<TouristSiteDialog> createState() => _TouristSiteDialogState();
-}
-
-class _TouristSiteDialogState extends State<TouristSiteDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _websiteController = TextEditingController();
-  final _priceController = TextEditingController();
-
-  String _selectedCity = AppConstants.syrianCities.first;
-  String _selectedCategory = 'all';
-  double _rating = 0.0;
-  double _latitude = 0.0;
-  double _longitude = 0.0;
-  List<String> _imageUrls = [];
-  TextEditingController _imageUrlController = TextEditingController();
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.site != null) {
-      _nameController.text = widget.site!.name;
-      _descriptionController.text = widget.site!.description;
-      _addressController.text = widget.site!.address;
-      _phoneController.text = widget.site!.phone;
-      _websiteController.text = widget.site!.website;
-      _priceController.text = widget.site!.price.toString();
-      _selectedCity = widget.site!.city;
-      _selectedCategory = widget.site!.category;
-      _rating = widget.site!.rating;
-      _latitude = widget.site!.latitude;
-      _longitude = widget.site!.longitude;
-      _imageUrls = List.from(widget.site!.images);
-    }
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    _addressController.dispose();
-    _phoneController.dispose();
-    _websiteController.dispose();
-    _priceController.dispose();
-    super.dispose();
-  }
-
-  void _addImageUrl() {
-    final url = _imageUrlController.text.trim();
-    if (url.isNotEmpty) {
-      // Validate URL format
-      String processedUrl = url;
-
-      // Handle different URL formats
-      if (!url.startsWith('http://') &&
-          !url.startsWith('https://') &&
-          !url.startsWith('data:image/')) {
-        if (url.startsWith('//')) {
-          processedUrl = 'https:$url';
-        } else if (url.startsWith('/')) {
-          processedUrl = 'https://example.com$url';
-        } else if (url.contains('.') && !url.contains('://')) {
-          processedUrl = 'https://$url';
-        }
-      }
-
-      // Validate URL
-      try {
-        if (!processedUrl.startsWith('data:image/')) {
-          Uri.parse(processedUrl);
-        }
-
-        setState(() {
-          _imageUrls.add(processedUrl);
-          _imageUrlController.clear();
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم إضافة رابط الصورة بنجاح'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 1),
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('رابط الصورة غير صحيح: $url'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى إدخال رابط الصورة'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 1),
-        ),
-      );
-    }
-  }
-
-  void _removeImageUrl(int index) {
-    setState(() {
-      _imageUrls.removeAt(index);
-    });
-  }
-
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final site = TouristSite(
-        id: widget.site?.id ?? '',
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim(),
-        city: _selectedCity,
-        address: _addressController.text.trim(),
-        phone: _phoneController.text.trim(),
-        website: _websiteController.text.trim(),
-        category: _selectedCategory,
-        price: double.tryParse(_priceController.text) ?? 0.0,
-        rating: _rating,
-        latitude: _latitude,
-        longitude: _longitude,
-        images: _imageUrls,
-        createdAt: widget.site?.createdAt ?? DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      if (widget.site == null) {
-        // Create new site
-        await FirebaseFirestore.instance
-            .collection(AppConstants.touristSitesCollection)
-            .add(site.toFirestore());
-      } else {
-        // Update existing site
-        await FirebaseFirestore.instance
-            .collection(AppConstants.touristSitesCollection)
-            .doc(widget.site!.id)
-            .update(site.toFirestore());
-      }
-
-      if (mounted) {
-        Navigator.of(context).pop(site);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.site == null
-                  ? 'تم إضافة الموقع السياحي بنجاح'
-                  : 'تم تحديث الموقع السياحي بنجاح',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('فشل في حفظ الموقع السياحي: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Row(
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
           Expanded(
-            child: Text(
-              widget.site == null ? 'إضافة موقع سياحي' : 'تعديل موقع سياحي',
+            child: _buildStatCard(
+              'إجمالي المواقع',
+              totalSites.toString(),
+              Icons.place,
+              Colors.green,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildStatCard(
+              'الفئات',
+              categories.toString(),
+              Icons.category,
+              Colors.blue,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildStatCard(
+              'إجمالي الصور',
+              totalImages.toString(),
+              Icons.photo_library,
+              Colors.orange,
             ),
           ),
         ],
       ),
-      content: SizedBox(
-        width: 600,
-        height: MediaQuery.of(context).size.height * 0.8,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'اسم الموقع',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'يرجى إدخال اسم الموقع';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
+    );
+  }
 
-                TextFormField(
-                  controller: _descriptionController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'الوصف',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'يرجى إدخال وصف الموقع';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                DropdownButtonFormField<String>(
-                  value: _selectedCity,
-                  decoration: const InputDecoration(
-                    labelText: 'المدينة',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: AppConstants.syrianCities.map((city) {
-                    return DropdownMenuItem(value: city, child: Text(city));
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedCity = value!;
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                DropdownButtonFormField<String>(
-                  value: _selectedCategory,
-                  decoration: const InputDecoration(
-                    labelText: 'الفئة',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    DropdownMenuItem(value: 'all', child: Text('الكل')),
-                    DropdownMenuItem(
-                      value: 'archaeological',
-                      child: Text('المواقع الأثرية'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'religious',
-                      child: Text('الأماكن الدينية'),
-                    ),
-                    DropdownMenuItem(value: 'museums', child: Text('المتاحف')),
-                    DropdownMenuItem(value: 'parks', child: Text('الحدائق')),
-                    DropdownMenuItem(value: 'beaches', child: Text('الشواطئ')),
-                    DropdownMenuItem(value: 'markets', child: Text('الأسواق')),
-                    DropdownMenuItem(value: 'castle', child: Text('القلاع')),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedCategory = value!;
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                TextFormField(
-                  controller: _addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'العنوان',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _phoneController,
-                        decoration: const InputDecoration(
-                          labelText: 'رقم الهاتف',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _websiteController,
-                        decoration: const InputDecoration(
-                          labelText: 'الموقع الإلكتروني',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _priceController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'السعر',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('التقييم'),
-                          Slider(
-                            value: _rating,
-                            min: 0,
-                            max: 5,
-                            divisions: 10,
-                            label: _rating.toStringAsFixed(1),
-                            onChanged: (value) {
-                              setState(() {
-                                _rating = value;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        initialValue: _latitude.toString(),
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'خط العرض',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) {
-                          _latitude = double.tryParse(value) ?? 0.0;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextFormField(
-                        initialValue: _longitude.toString(),
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'خط الطول',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) {
-                          _longitude = double.tryParse(value) ?? 0.0;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Images section
-                const Text(
-                  'روابط الصور',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _imageUrlController,
-                        decoration: const InputDecoration(
-                          hintText:
-                              'أدخل رابط الصورة (https://example.com/image.jpg)',
-                          helperText:
-                              'يدعم: HTTP/HTTPS URLs, Base64, ve الصور المحلية',
-                          border: OutlineInputBorder(),
-                        ),
-                        onSubmitted: (value) => _addImageUrl(),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add_link),
-                      onPressed: _addImageUrl,
-                    ),
-                  ],
-                ),
-                if (_imageUrls.isNotEmpty)
-                  SizedBox(
-                    height: 100,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _imageUrls.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: Stack(
-                            children: [
-                              SmartImageWidget(
-                                imageUrl: _imageUrls[index],
-                                width: 100,
-                                height: 100,
-                                fit: BoxFit.cover,
-                              ),
-                              Positioned(
-                                top: 4,
-                                right: 4,
-                                child: GestureDetector(
-                                  onTap: () => _removeImageUrl(index),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.close,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-              ],
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(icon, size: 32, color: color),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-          ),
+            Text(
+              title,
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('إلغاء'),
-        ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _save,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(widget.site == null ? 'إضافة' : 'حفظ'),
-        ),
-      ],
     );
+  }
+
+  String _getCategoryName(String categoryId) {
+    return AppConstants.categories.contains(categoryId)
+        ? categoryId
+        : 'غير محدد';
   }
 }
 
@@ -1623,6 +1031,466 @@ class _ImageGalleryScreenState extends State<_ImageGalleryScreen> {
             ),
         ],
       ),
+    );
+  }
+}
+
+class TouristSiteDialog extends StatefulWidget {
+  final TouristSite? site;
+
+  const TouristSiteDialog({super.key, this.site});
+
+  @override
+  State<TouristSiteDialog> createState() => _TouristSiteDialogState();
+}
+
+class _TouristSiteDialogState extends State<TouristSiteDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _websiteController = TextEditingController();
+  final _priceController = TextEditingController();
+
+  String _selectedCategory = '';
+  double _rating = 0.0;
+  double _latitude = 0.0;
+  double _longitude = 0.0;
+  List<String> _imageUrls = [];
+  TextEditingController _imageUrlController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.site != null) {
+      _nameController.text = widget.site!.name;
+      _descriptionController.text = widget.site!.description;
+      _cityController.text = widget.site!.city;
+      _addressController.text = widget.site!.address;
+      _phoneController.text = widget.site!.phone;
+      _websiteController.text = widget.site!.website;
+      _priceController.text = widget.site!.price.toString();
+      _selectedCategory = widget.site!.category;
+      _rating = widget.site!.rating;
+      _latitude = widget.site!.latitude;
+      _longitude = widget.site!.longitude;
+      _imageUrls = List.from(widget.site!.images);
+    } else {
+      _selectedCategory = AppConstants.categories.isNotEmpty
+          ? AppConstants.categories.first
+          : '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _cityController.dispose();
+    _addressController.dispose();
+    _phoneController.dispose();
+    _websiteController.dispose();
+    _priceController.dispose();
+    _imageUrlController.dispose();
+    super.dispose();
+  }
+
+  void _addImageUrl() {
+    final url = _imageUrlController.text.trim();
+    if (url.isNotEmpty) {
+      setState(() {
+        _imageUrls.add(url);
+        _imageUrlController.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إضافة رابط الصورة بنجاح'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 1),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى إدخال رابط الصورة'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  void _removeImageUrl(int index) {
+    setState(() {
+      _imageUrls.removeAt(index);
+    });
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final site = TouristSite(
+        id: widget.site?.id ?? '',
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        city: _cityController.text.trim(),
+        address: _addressController.text.trim(),
+        phone: _phoneController.text.trim(),
+        website: _websiteController.text.trim(),
+        category: _selectedCategory,
+        price: double.tryParse(_priceController.text) ?? 0.0,
+        rating: _rating,
+        latitude: _latitude,
+        longitude: _longitude,
+        images: _imageUrls,
+        createdAt: widget.site?.createdAt ?? DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      if (widget.site == null) {
+        // Create new site
+        await FirebaseFirestore.instance
+            .collection(AppConstants.touristSitesCollection)
+            .add(site.toFirestore());
+      } else {
+        // Update existing site
+        await FirebaseFirestore.instance
+            .collection(AppConstants.touristSitesCollection)
+            .doc(widget.site!.id)
+            .update(site.toFirestore());
+      }
+
+      if (mounted) {
+        Navigator.of(context).pop(site);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.site == null
+                  ? 'تم إضافة الموقع السياحي بنجاح'
+                  : 'تم تحديث الموقع السياحي بنجاح',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فشل في حفظ الموقع السياحي: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          Expanded(
+            child: Text(
+              widget.site == null ? 'إضافة موقع سياحي' : 'تعديل موقع سياحي',
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 600,
+        height: MediaQuery.of(context).size.height * 0.8,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'اسم الموقع السياحي',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'يرجى إدخال اسم الموقع السياحي';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _descriptionController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'وصف الموقع السياحي',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'يرجى إدخال وصف الموقع السياحي';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _cityController,
+                  decoration: const InputDecoration(
+                    labelText: 'المدينة',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'يرجى إدخال المدينة';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                TextFormField(
+                  controller: _addressController,
+                  decoration: const InputDecoration(
+                    labelText: 'العنوان',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _phoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'رقم الهاتف',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _websiteController,
+                        decoration: const InputDecoration(
+                          labelText: 'الموقع الإلكتروني',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _priceController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'السعر',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('التقييم'),
+                          Slider(
+                            value: _rating,
+                            min: 0,
+                            max: 5,
+                            divisions: 10,
+                            label: _rating.toStringAsFixed(1),
+                            onChanged: (value) {
+                              setState(() {
+                                _rating = value;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: _latitude.toString(),
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'خط العرض',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          _latitude = double.tryParse(value) ?? 0.0;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: _longitude.toString(),
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'خط الطول',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          _longitude = double.tryParse(value) ?? 0.0;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'الفئة',
+                    border: OutlineInputBorder(),
+                  ),
+                  value: _selectedCategory,
+                  items: AppConstants.categories
+                      .map(
+                        (category) => DropdownMenuItem(
+                          value: category,
+                          child: Text(category),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCategory = value!;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'يرجى اختيار الفئة';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Images section
+                const Text(
+                  'روابط الصور',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _imageUrlController,
+                        decoration: const InputDecoration(
+                          hintText:
+                              'أدخل رابط الصورة (https://example.com/image.jpg)',
+                          helperText:
+                              'يدعم: HTTP/HTTPS URLs, Base64, ve الصور المحلية',
+                          border: OutlineInputBorder(),
+                        ),
+                        onSubmitted: (value) => _addImageUrl(),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add_link),
+                      onPressed: _addImageUrl,
+                    ),
+                  ],
+                ),
+                if (_imageUrls.isNotEmpty)
+                  SizedBox(
+                    height: 100,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _imageUrls.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Stack(
+                            children: [
+                              SmartImageWidget(
+                                imageUrl: _imageUrls[index],
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                              ),
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: GestureDetector(
+                                  onTap: () => _removeImageUrl(index),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        ElevatedButton(
+          onPressed: _isLoading ? null : _save,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(widget.site == null ? 'إضافة' : 'حفظ'),
+        ),
+      ],
     );
   }
 }

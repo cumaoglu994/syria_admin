@@ -45,6 +45,20 @@ class AppConstants {
     'القنيطرة',
   ];
 
+  // Tourist Site Categories
+  static const List<String> categories = [
+    'المواقع الأثرية',
+    'الأماكن الدينية',
+    'المتاحف',
+    'الحدائق',
+    'الشواطئ',
+    'الأسواق',
+    'القلاع',
+    'الجبال',
+    'الأنهار',
+    'الينابيع',
+  ];
+
   // Pagination
   static const int defaultPageSize = 20;
   static const int maxPageSize = 100;
